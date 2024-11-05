@@ -14,7 +14,6 @@
 #include "levenshtein.h"
 #include "strmap.h"
 #include "utils.h"
-#define STOPWATCH_IMPLEMENTATION
 #include "stopwatch.h"
 
 #define invalid_chars "\\/:*?\"<>|"
@@ -268,33 +267,35 @@ int main(void)
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
                 if (buffer.count > 0) {
-                    char temp[100];
+                    static char temp[256];
                     sprintf(temp, "start /b %s", bins.items[0]);
                     system(temp);
                     // _execlp(bins.items[0], bins.items[0], NULL);
                     list_clear(&buffer);
                 }
-            } goto PROGRAM_END;
+                goto PROGRAM_END;
+                break;
+            }
         }
         if (IsKeyDown(KEY_LEFT_CONTROL)) {
             if (IsKeyPressed(KEY_BACKSPACE)) {
                 delete_word(&buffer, &bins);
                 do_backspace = true;
-                sw_reset(&backspace_sw);
+                sw_start(&backspace_sw);
             }
         }
         else {
             if (IsKeyDown(KEY_BACKSPACE)) {
                 if (do_backspace) {
-                    sw_reset(&backspace_down_sw);
+                    sw_start(&backspace_down_sw);
                     delete_char(&buffer, &bins);
                     do_backspace = false;
-                    sw_reset(&backspace_sw);
+                    sw_start(&backspace_sw);
                 } 
                 else {
                     if (sw_elapsedms(&backspace_sw) > backspace_speed_ms && sw_elapsedms(&backspace_down_sw) > 300) {
                         delete_char(&buffer, &bins);
-                        sw_reset(&backspace_sw);
+                        sw_start(&backspace_sw);
                     }
                 }
             }
@@ -304,7 +305,7 @@ int main(void)
         }
 
         BeginDrawing();
-        { 
+        {
             ClearBackground(GRAY);
             DrawRectangle(15, 15, width - 30, 45, DARKGRAY);
             char *c_buffer = str_to_charptr(&buffer);
