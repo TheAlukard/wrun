@@ -225,6 +225,12 @@ StrMap import_aliases()
     return map;
 }
 
+void refresh_bins(CstrList *bins, char* *selected)
+{
+    qsort(bins->items, bins->count, sizeof(*bins->items), compare_lev);
+    *selected = bins->items[0];
+}
+
 int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
@@ -246,35 +252,34 @@ int main(void)
     bool do_backspace = true;
     sw_start(&backspace_sw);
     sw_start(&backspace_down_sw);
+    char *selected = "";
 
     create_window(width, height, "");
 
     while (! WindowShouldClose()) {
-        char c = GetCharPressed();
+        char c;
+        if ((c = GetCharPressed()) != 0) {
+            if (!str_contains(invalid_chars, invalid_chars_len, c)) {
+                list_push(&buffer, c);
+                refresh_bins(&bins, &selected);
+            } 
+        }
 
         char *value = strmap_get(&aliases, str_to_charptr(&buffer));
         if (value != NULL) {
-            bins.items[0] = value;
-        }
-
-        if (c != 0) {
-            if (! str_contains(invalid_chars, invalid_chars_len, c)) {
-                list_push(&buffer, c);
-                qsort(bins.items, bins.count, sizeof(*bins.items), compare_lev);
-            } 
+            selected = value;
         }
 
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
                 if (buffer.count > 0) {
                     static char temp[256];
-                    sprintf(temp, "start /b %s", bins.items[0]);
+                    sprintf(temp, "start /b %s", selected);
                     system(temp);
                     // _execlp(bins.items[0], bins.items[0], NULL);
                     list_clear(&buffer);
                 }
                 goto PROGRAM_END;
-                break;
             }
         }
         if (IsKeyDown(KEY_LEFT_CONTROL)) {
@@ -282,6 +287,7 @@ int main(void)
                 delete_word(&buffer, &bins);
                 do_backspace = true;
                 sw_start(&backspace_sw);
+                refresh_bins(&bins, &selected);
             }
         }
         else {
@@ -291,11 +297,13 @@ int main(void)
                     delete_char(&buffer, &bins);
                     do_backspace = false;
                     sw_start(&backspace_sw);
+                    refresh_bins(&bins, &selected);
                 } 
                 else {
                     if (sw_elapsedms(&backspace_sw) > backspace_speed_ms && sw_elapsedms(&backspace_down_sw) > 300) {
                         delete_char(&buffer, &bins);
                         sw_start(&backspace_sw);
+                        refresh_bins(&bins, &selected);
                     }
                 }
             }
@@ -305,17 +313,20 @@ int main(void)
         }
 
         BeginDrawing();
+        ClearBackground(GRAY);
         {
-            ClearBackground(GRAY);
+            int size = 30;
             DrawRectangle(15, 15, width - 30, 45, DARKGRAY);
+            DrawRectangle(15, 65, width - 30, 35, GetColor(0x181818FF));
             char *c_buffer = str_to_charptr(&buffer);
-            int j = MeasureText(c_buffer, 30);
+            int j = MeasureText(c_buffer, size);
             DrawRectangle(20 + j, 15, 5, 45, LIGHTGRAY);
-            int start = 30;
+            int start = 70;
             if (buffer.count > 0) {
-                DrawText(c_buffer, 20, 25, start, WHITE);
-                for (int i = 0; i < 7; i++) {
-                    DrawText(bins.items[i], 20, start * (i + 2), 30, WHITE);
+                DrawText(c_buffer, 20, 25, size, WHITE);
+                DrawText(selected, 20, 67, size, WHITE);
+                for (int i = 1; i <= 6; i++) {
+                    DrawText(bins.items[i - 1], 20, start + (33 * i), size, WHITE);
                 }
             }
         }
