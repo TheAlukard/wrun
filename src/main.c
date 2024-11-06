@@ -234,6 +234,7 @@ void refresh_bins(CstrList *bins, char* *selected)
 int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     // SetExitKey(KEY_NULL);
     pthread_t thread;
     CstrList bins;
@@ -313,20 +314,22 @@ int main(void)
         }
 
         BeginDrawing();
-        ClearBackground(GRAY);
+        ClearBackground(GetColor(0x181818FF));
         {
             int size = 30;
+            float spacing = 0.8;
+            Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", size, NULL, 0);
             DrawRectangle(15, 15, width - 30, 45, DARKGRAY);
-            DrawRectangle(15, 65, width - 30, 35, GetColor(0x181818FF));
+            DrawRectangle(15, 65, width - 30, 35, GRAY);
             char *c_buffer = str_to_charptr(&buffer);
-            int j = MeasureText(c_buffer, size);
-            DrawRectangle(20 + j, 15, 5, 45, LIGHTGRAY);
+            Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
+            DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
             int start = 70;
             if (buffer.count > 0) {
-                DrawText(c_buffer, 20, 25, size, WHITE);
-                DrawText(selected, 20, 67, size, WHITE);
+                DrawTextEx(font, c_buffer, (Vector2){20, 25}, size, spacing, WHITE);
+                DrawTextEx(font, selected, (Vector2){20, 67}, size, spacing, WHITE);
                 for (int i = 1; i <= 6; i++) {
-                    DrawText(bins.items[i - 1], 20, start + (33 * i), size, WHITE);
+                    DrawTextEx(font, bins.items[i - 1], (Vector2){20, start + (33 * i)}, size, spacing, WHITE);
                 }
             }
         }
