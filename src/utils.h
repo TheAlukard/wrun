@@ -1,5 +1,9 @@
 #pragma once
 
+#include "raylib.h"
+
+#define Vec2(x_, y_) ((Vector2){.x = x_, .y = y_})
+
 static inline bool str_contains(char* str, size_t size, char c)
 {
     for (size_t i = 0; i < size; i++) {

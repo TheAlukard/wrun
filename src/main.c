@@ -9,7 +9,6 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <process.h>
-#include "raylib.h"
 #include "list.h"
 #include "levenshtein.h"
 #include "strmap.h"
@@ -49,13 +48,6 @@ void create_window(int width, int height, const char *title)
     SetWindowSize(width, height);
     // SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (75 / 2));
     SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (height / 2));
-}
-
-FORCE_INLINE void str_lower(String *s)
-{
-    for (size_t i = 0; i < s->count; i++) {
-        s->items[i] = char_lower(s->items[i]);
-    }
 }
 
 String *BUFF;
@@ -99,7 +91,7 @@ FORCE_INLINE void delete_word(String *buffer, CstrList *bins)
         }
     } 
     else {
-        while (! isspace(buffer->items[buffer->count - 1]) && buffer->count > 0) {
+        while (!isspace(buffer->items[buffer->count - 1]) && buffer->count > 0) {
             Unused(list_pop(buffer, char));
         }
     }
@@ -109,7 +101,7 @@ FORCE_INLINE void delete_word(String *buffer, CstrList *bins)
 
 FORCE_INLINE void add_bins(char *path, CstrList *bins)
 {
-    if (! DirectoryExists(path)) return;
+    if (!DirectoryExists(path)) return;
 
     FilePathList flist = LoadDirectoryFilesEx(path, ".exe", false);        
 
@@ -171,7 +163,7 @@ bool read_key_value(char* *key, char* *value, FILE *f)
 
         if (buffer[i] == ':') {
             int size1 = i + 1;
-            *key = (char*)malloc(sizeof(char) * size1);             
+            *key = (char*)malloc(sizeof(char) * size1);
             (*key)[size1 - 1] = '\0';
             buffer[i] = '\0';
             // printf("buffer1: %s\n", buffer);
@@ -190,7 +182,7 @@ bool read_key_value(char* *key, char* *value, FILE *f)
                     buffer[i] = '\0';
                     // printf("buffer2: %s\n", &buffer[start]);
                     strcpy(*value, &buffer[start]);
-                
+
                     return true;
                 }
                 i++;
@@ -210,7 +202,7 @@ StrMap import_aliases()
     sprintf(aliases_path, "%s%s", home_env, "\\.aliases.txt");
     StrMap map = strmap_new();
 
-    if (! FileExists(aliases_path)) return map;
+    if (!FileExists(aliases_path)) return map;
 
     FILE *f = fopen(aliases_path, "r");
     char *key;
@@ -234,30 +226,29 @@ void refresh_bins(CstrList *bins, char* *selected)
 int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    /* SetConfigFlags(FLAG_MSAA_4X_HINT); */
     // SetExitKey(KEY_NULL);
+
     pthread_t thread;
     CstrList bins;
     list_allocs(&bins, 1000);
     pthread_create(&thread, NULL, get_bins, &bins);
     StrMap aliases = import_aliases();
     /* strmap_print(&aliases); */
-    int height = 300;
-    int width  = 300;
+    const int HEIGHT = 300;
+    const int WIDTH  = 300;
+    const int FPS = 60;
     String buffer = {0};
     list_alloc(&buffer);
     BUFF = &buffer;
-    StopWatch backspace_sw = {0};
-    StopWatch backspace_down_sw = {0};
-    uint64_t backspace_speed_ms = 100;
-    bool do_backspace = true;
-    sw_start(&backspace_sw);
-    sw_start(&backspace_down_sw);
+    int backspace_frames = 0;
+    Unused(backspace_frames);
     char *selected = "";
 
-    create_window(width, height, "");
+    create_window(WIDTH, HEIGHT, "");
+    SetTargetFPS(FPS);
 
-    while (! WindowShouldClose()) {
+    while (!WindowShouldClose()) {
         char c;
         if ((c = GetCharPressed()) != 0) {
             if (!str_contains(invalid_chars, invalid_chars_len, c)) {
@@ -282,36 +273,32 @@ int main(void)
                 }
                 goto PROGRAM_END;
             }
+            case KEY_BACKSPACE: {
+                delete_char(&buffer, &bins);
+                refresh_bins(&bins, &selected);
+                backspace_frames = 0;
+                break;
+            }
         }
         if (IsKeyDown(KEY_LEFT_CONTROL)) {
             if (IsKeyPressed(KEY_BACKSPACE)) {
                 delete_word(&buffer, &bins);
-                do_backspace = true;
-                sw_start(&backspace_sw);
                 refresh_bins(&bins, &selected);
+            }
+            else if (IsKeyPressed(KEY_V)) {
+
             }
         }
         else {
             if (IsKeyDown(KEY_BACKSPACE)) {
-                if (do_backspace) {
-                    sw_start(&backspace_down_sw);
+                if (backspace_frames > FPS / 2) {
                     delete_char(&buffer, &bins);
-                    do_backspace = false;
-                    sw_start(&backspace_sw);
                     refresh_bins(&bins, &selected);
-                } 
-                else {
-                    if (sw_elapsedms(&backspace_sw) > backspace_speed_ms && sw_elapsedms(&backspace_down_sw) > 300) {
-                        delete_char(&buffer, &bins);
-                        sw_start(&backspace_sw);
-                        refresh_bins(&bins, &selected);
-                    }
                 }
             }
-            if (IsKeyUp(KEY_BACKSPACE)) {
-                do_backspace = true;
-            }
         }
+
+        backspace_frames++;
 
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
@@ -319,17 +306,17 @@ int main(void)
             int size = 30;
             float spacing = 0.8;
             Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", size, NULL, 0);
-            DrawRectangle(15, 15, width - 30, 45, DARKGRAY);
-            DrawRectangle(15, 65, width - 30, 35, GRAY);
+            DrawRectangle(15, 15, WIDTH - 30, 45, DARKGRAY);
+            DrawRectangle(15, 65, WIDTH - 30, 35, GRAY);
             char *c_buffer = str_to_charptr(&buffer);
             Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
             DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
             int start = 70;
             if (buffer.count > 0) {
-                DrawTextEx(font, c_buffer, (Vector2){20, 25}, size, spacing, WHITE);
-                DrawTextEx(font, selected, (Vector2){20, 67}, size, spacing, WHITE);
+                DrawTextEx(font, c_buffer, Vec2(20, 25), size, spacing, WHITE);
+                DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
                 for (int i = 1; i <= 6; i++) {
-                    DrawTextEx(font, bins.items[i - 1], (Vector2){20, start + (33 * i)}, size, spacing, WHITE);
+                    DrawTextEx(font, bins.items[i - 1], Vec2(20, start + (33 * i)), size, spacing, WHITE);
                 }
             }
         }
@@ -337,6 +324,6 @@ int main(void)
     }
 
 PROGRAM_END:
-    // pthread_join(thread, NULL);
+    /* pthread_join(thread, NULL); */
     CloseWindow();
 }

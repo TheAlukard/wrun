@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-uint32_t hash(char *str)
+static uint32_t hash(char *str)
 {
     uint32_t hash = 5381;
     int c = 1;
