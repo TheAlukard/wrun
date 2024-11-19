@@ -18,7 +18,7 @@ static uint32_t hash(char *str)
     return hash;
 }
 
-StrMap strmap_new()
+StrMap strmap_new(void)
 {
     StrMap map;
     map.capacity = DEFAULT_STRMAP_CAP;

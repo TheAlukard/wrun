@@ -13,17 +13,16 @@
 #include "levenshtein.h"
 #include "strmap.h"
 #include "utils.h"
+#include "bins.h"
 #include "stopwatch.h"
 
 #define invalid_chars "\\/:*?\"<>|"
 #define invalid_chars_len (array_len(invalid_chars) - 1)
+#define STR_ARENA_SIZE 1000
+char STR_ARENA[STR_ARENA_SIZE];
 
 LIST_DEF(String, char);
 LIST_DEF(StringList, String);
-LIST_DEF(CstrList, char*);
-
-#define STR_ARENA_SIZE 1000
-char STR_ARENA[STR_ARENA_SIZE];
 
 FORCE_INLINE char* str_to_charptr(String *str) 
 {
@@ -73,15 +72,16 @@ int compare_lev(const void *_x, const void *_y)
     return dx - dy;
 }
 
-FORCE_INLINE void delete_char(String *buffer, CstrList *bins)
+FORCE_INLINE void delete_char(String *buffer, Bins *bins)
 {
     if (buffer->count <= 0) return;
 
     Unused(list_pop(buffer, char));
-    qsort(bins->items, bins->count, sizeof(*bins->items), compare_lev);
+    CstrList *list = get_strlist(bins, BUFF->items[0]);
+    qsort(list, list->count, sizeof(*list->items), compare_lev);
 }
 
-FORCE_INLINE void delete_word(String *buffer, CstrList *bins)
+FORCE_INLINE void delete_word(String *buffer, Bins *bins)
 {
     if (buffer->count <= 0) return;
 
@@ -96,10 +96,11 @@ FORCE_INLINE void delete_word(String *buffer, CstrList *bins)
         }
     }
 
-    qsort(bins->items, bins->count, sizeof(*bins->items), compare_lev);
+    CstrList *list = get_strlist(bins, BUFF->items[0]);
+    qsort(list, list->count, sizeof(*list->items), compare_lev);
 }
 
-FORCE_INLINE void add_bins(char *path, CstrList *bins)
+FORCE_INLINE void add_bins(char *path, Bins *bins)
 {
     if (!DirectoryExists(path)) return;
 
@@ -124,13 +125,13 @@ FORCE_INLINE void add_bins(char *path, CstrList *bins)
 
         cur_path[end] = '\0';
 
-        list_push(bins, &cur_path[start]);
+        list_push(get_strlist(bins, cur_path[start]), &cur_path[start]);
     }
 }
 
 void* get_bins(void *_list)
 {
-    CstrList *bins = (CstrList*)_list;
+    Bins *bins = (Bins*)_list;
 
     char *Path = getenv("path");
 
@@ -195,7 +196,7 @@ bool read_key_value(char* *key, char* *value, FILE *f)
     return false;
 }
 
-StrMap import_aliases()
+StrMap import_aliases(void)
 {
     const char *home_env = getenv("HOME");
     char aliases_path[100]; 
@@ -217,29 +218,31 @@ StrMap import_aliases()
     return map;
 }
 
-void refresh_bins(CstrList *bins, char* *selected)
+void refresh_bins(Bins *bins, char* *selected)
 {
-    qsort(bins->items, bins->count, sizeof(*bins->items), compare_lev);
-    *selected = bins->items[0];
+    CstrList *list = get_strlist(bins, BUFF->items[0]);
+    if (list->count <= 0) return;
+
+    qsort(list, list->count, sizeof(*list->items), compare_lev);
+    *selected = list->items[0];
 }
 
 int main(void)
 {
+    printf("hi\n");
     SetTraceLogLevel(LOG_ERROR); 
-    /* SetConfigFlags(FLAG_MSAA_4X_HINT); */
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     // SetExitKey(KEY_NULL);
 
     pthread_t thread;
-    CstrList bins;
-    list_allocs(&bins, 1000);
-    pthread_create(&thread, NULL, get_bins, &bins);
+    Bins *bins = bins_alloc();
+    pthread_create(&thread, NULL, get_bins, bins);
     StrMap aliases = import_aliases();
     /* strmap_print(&aliases); */
     const int HEIGHT = 300;
     const int WIDTH  = 300;
     const int FPS = 60;
     String buffer = {0};
-    list_alloc(&buffer);
     BUFF = &buffer;
     int backspace_frames = 0;
     Unused(backspace_frames);
@@ -253,7 +256,7 @@ int main(void)
         if ((c = GetCharPressed()) != 0) {
             if (!str_contains(invalid_chars, invalid_chars_len, c)) {
                 list_push(&buffer, c);
-                refresh_bins(&bins, &selected);
+                refresh_bins(bins, &selected);
             } 
         }
 
@@ -274,16 +277,16 @@ int main(void)
                 goto PROGRAM_END;
             }
             case KEY_BACKSPACE: {
-                delete_char(&buffer, &bins);
-                refresh_bins(&bins, &selected);
+                delete_char(&buffer, bins);
+                refresh_bins(bins, &selected);
                 backspace_frames = 0;
                 break;
             }
         }
         if (IsKeyDown(KEY_LEFT_CONTROL)) {
             if (IsKeyPressed(KEY_BACKSPACE)) {
-                delete_word(&buffer, &bins);
-                refresh_bins(&bins, &selected);
+                delete_word(&buffer, bins);
+                refresh_bins(bins, &selected);
             }
             else if (IsKeyPressed(KEY_V)) {
 
@@ -292,8 +295,8 @@ int main(void)
         else {
             if (IsKeyDown(KEY_BACKSPACE)) {
                 if (backspace_frames > FPS / 2) {
-                    delete_char(&buffer, &bins);
-                    refresh_bins(&bins, &selected);
+                    delete_char(&buffer, bins);
+                    refresh_bins(bins, &selected);
                 }
             }
         }
@@ -312,11 +315,12 @@ int main(void)
             Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
             DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
             int start = 70;
+            CstrList *bin_list = get_strlist(bins, buffer.items[0]);
             if (buffer.count > 0) {
                 DrawTextEx(font, c_buffer, Vec2(20, 25), size, spacing, WHITE);
                 DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
-                for (int i = 1; i <= 6; i++) {
-                    DrawTextEx(font, bins.items[i - 1], Vec2(20, start + (33 * i)), size, spacing, WHITE);
+                for (size_t i = 1; i < bin_list->count && i <= 6; i++) {
+                    DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), size, spacing, WHITE);
                 }
             }
         }
