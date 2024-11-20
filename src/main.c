@@ -1,20 +1,10 @@
 #define _CRT_SECURE_NO_DEPRECATE
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
 #include <pthread.h>
-#include <ctype.h>
-#include <process.h>
 #include "list.h"
 #include "levenshtein.h"
 #include "strmap.h"
 #include "utils.h"
 #include "bins.h"
-#include "stopwatch.h"
 
 #define invalid_chars "\\/:*?\"<>|"
 #define invalid_chars_len (array_len(invalid_chars) - 1)
@@ -38,15 +28,6 @@ FORCE_INLINE char* str_to_charptr(String *str)
 
 
     return ptr;
-}
-
-void create_window(int width, int height, const char *title)
-{
-    InitWindow(width, height, title);
-    ToggleBorderlessWindowed();
-    SetWindowSize(width, height);
-    // SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (75 / 2));
-    SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (height / 2));
 }
 
 String *BUFF;
@@ -78,7 +59,7 @@ FORCE_INLINE void delete_char(String *buffer, Bins *bins)
 
     Unused(list_pop(buffer, char));
     CstrList *list = get_strlist(bins, BUFF->items[0]);
-    qsort(list, list->count, sizeof(*list->items), compare_lev);
+    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
 }
 
 FORCE_INLINE void delete_word(String *buffer, Bins *bins)
@@ -97,7 +78,7 @@ FORCE_INLINE void delete_word(String *buffer, Bins *bins)
     }
 
     CstrList *list = get_strlist(bins, BUFF->items[0]);
-    qsort(list, list->count, sizeof(*list->items), compare_lev);
+    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
 }
 
 FORCE_INLINE void add_bins(char *path, Bins *bins)
@@ -220,25 +201,25 @@ StrMap import_aliases(void)
 
 void refresh_bins(Bins *bins, char* *selected)
 {
+    if (BUFF->count <= 0) return;
+
     CstrList *list = get_strlist(bins, BUFF->items[0]);
     if (list->count <= 0) return;
 
-    qsort(list, list->count, sizeof(*list->items), compare_lev);
+    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
     *selected = list->items[0];
 }
 
 int main(void)
 {
-    printf("hi\n");
     SetTraceLogLevel(LOG_ERROR); 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     // SetExitKey(KEY_NULL);
-
+    
     pthread_t thread;
     Bins *bins = bins_alloc();
     pthread_create(&thread, NULL, get_bins, bins);
     StrMap aliases = import_aliases();
-    /* strmap_print(&aliases); */
     const int HEIGHT = 300;
     const int WIDTH  = 300;
     const int FPS = 60;
@@ -257,7 +238,7 @@ int main(void)
             if (!str_contains(invalid_chars, invalid_chars_len, c)) {
                 list_push(&buffer, c);
                 refresh_bins(bins, &selected);
-            } 
+            }
         }
 
         char *value = strmap_get(&aliases, str_to_charptr(&buffer));
@@ -271,7 +252,6 @@ int main(void)
                     static char temp[256];
                     sprintf(temp, "start /b %s", selected);
                     system(temp);
-                    // _execlp(bins.items[0], bins.items[0], NULL);
                     list_clear(&buffer);
                 }
                 goto PROGRAM_END;
@@ -315,8 +295,8 @@ int main(void)
             Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
             DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
             int start = 70;
-            CstrList *bin_list = get_strlist(bins, buffer.items[0]);
             if (buffer.count > 0) {
+                CstrList *bin_list = get_strlist(bins, buffer.items[0]);
                 DrawTextEx(font, c_buffer, Vec2(20, 25), size, spacing, WHITE);
                 DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
                 for (size_t i = 1; i < bin_list->count && i <= 6; i++) {
