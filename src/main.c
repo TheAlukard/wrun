@@ -235,10 +235,8 @@ int main(void)
     while (!WindowShouldClose()) {
         char c;
         if ((c = GetCharPressed()) != 0) {
-            if (!str_contains(invalid_chars, invalid_chars_len, c)) {
-                list_push(&buffer, c);
-                refresh_bins(bins, &selected);
-            }
+            list_push(&buffer, c);
+            refresh_bins(bins, &selected);
         }
 
         char *value = strmap_get(&aliases, str_to_charptr(&buffer));
@@ -248,12 +246,20 @@ int main(void)
 
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
-                if (buffer.count > 0) {
-                    static char temp[256];
+                if (buffer.count <= 0) break;
+
+                static char temp[256];
+                if (buffer.items[0] == '/' && buffer.count > 1) {
+                    sprintf(temp, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
+                    system(temp);
+                }
+                else {
                     sprintf(temp, "start /b %s", selected);
                     system(temp);
-                    list_clear(&buffer);
                 }
+
+                list_clear(&buffer);
+
                 goto PROGRAM_END;
             }
             case KEY_BACKSPACE: {
