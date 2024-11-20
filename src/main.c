@@ -53,13 +53,14 @@ int compare_lev(const void *_x, const void *_y)
     return dx - dy;
 }
 
+void refresh_bins(Bins *bins, char* *selected);
+
 FORCE_INLINE void delete_char(String *buffer, Bins *bins)
 {
     if (buffer->count <= 0) return;
 
     Unused(list_pop(buffer, char));
-    CstrList *list = get_strlist(bins, BUFF->items[0]);
-    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
+    refresh_bins(bins, NULL);
 }
 
 FORCE_INLINE void delete_word(String *buffer, Bins *bins)
@@ -77,8 +78,7 @@ FORCE_INLINE void delete_word(String *buffer, Bins *bins)
         }
     }
 
-    CstrList *list = get_strlist(bins, BUFF->items[0]);
-    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
+    refresh_bins(bins, NULL);
 }
 
 FORCE_INLINE void add_bins(char *path, Bins *bins)
@@ -203,11 +203,18 @@ void refresh_bins(Bins *bins, char* *selected)
 {
     if (BUFF->count <= 0) return;
 
-    CstrList *list = get_strlist(bins, BUFF->items[0]);
+    CstrList *list;
+    if (str_contains(invalid_chars, invalid_chars_len, BUFF->items[0]) && BUFF->count > 1) {
+        list = get_strlist(bins, BUFF->items[1]);
+    }
+    else {
+        list = get_strlist(bins, BUFF->items[0]);
+    }
+
     if (list->count <= 0) return;
 
     qsort(list->items, list->count, sizeof(*list->items), compare_lev);
-    *selected = list->items[0];
+    if (selected != NULL) *selected = list->items[0];
 }
 
 int main(void)
