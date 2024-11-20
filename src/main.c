@@ -1,5 +1,8 @@
+#include "raylib.h"
+#include <stdio.h>
 #define _CRT_SECURE_NO_DEPRECATE
 #include <pthread.h>
+#include <math.h>
 #include "list.h"
 #include "levenshtein.h"
 #include "strmap.h"
@@ -141,7 +144,7 @@ bool read_key_value(char* *key, char* *value, FILE *f)
     while (!feof(f) && i < 100) {
         buffer[i] = getc(f);
 
-        if (isspace(buffer[i])) continue;
+        if (isspace(buffer[i]) && buffer[i] != ' ') continue;
 
         if (buffer[i] == ':') {
             int size1 = i + 1;
@@ -154,8 +157,6 @@ bool read_key_value(char* *key, char* *value, FILE *f)
             int start = i;
             while (i < 100) {
                 buffer[i] = getc(f);
-
-                if (buffer[i] == ' ') continue;
 
                 if (buffer[i] == '\n' || feof(f)) {
                     int size2 = (i - start) + 1;
@@ -306,13 +307,35 @@ int main(void)
             DrawRectangle(15, 65, WIDTH - 30, 35, GRAY);
             char *c_buffer = str_to_charptr(&buffer);
             Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
-            DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
+            Vector2 k = MeasureTextEx(font, selected, size, spacing);
             int start = 70;
+            int showed = 6;
+
+            DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
+
             if (buffer.count > 0) {
+                if (k.x > WIDTH - 35) {
+                    float width_per_char = k.x / strlen(selected);
+                    int last_char = floor((WIDTH - 35) / width_per_char);
+                    int mag = ceil(k.x / (WIDTH - 35.f) + 0.1);
+                    char temp[100];
+                    for (int i = 1; i < mag; i++) {
+                        DrawRectangle(15, 65 + (i * 35), WIDTH - 30, 35, GRAY);
+                        start += 33;
+                        showed--;
+                        char *text = &selected[last_char * (i - 1)];
+                        sprintf(temp, "%.*s", last_char, text);
+                        DrawTextEx(font, temp, Vec2(20, 67 + ((i - 1) * 35)), size, spacing, WHITE);
+                    }
+                    char *text = &selected[last_char * (mag - 1)];
+                    DrawTextEx(font, text, Vec2(20, 67 + ((mag - 1) * 35)), size, spacing, WHITE);
+                }
+                else {
+                    DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
+                }
                 CstrList *bin_list = get_strlist(bins, buffer.items[0]);
                 DrawTextEx(font, c_buffer, Vec2(20, 25), size, spacing, WHITE);
-                DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
-                for (size_t i = 1; i < bin_list->count && i <= 6; i++) {
+                for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
                     DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), size, spacing, WHITE);
                 }
             }
