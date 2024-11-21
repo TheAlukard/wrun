@@ -1,13 +1,15 @@
-#include "raylib.h"
-#include <stdio.h>
 #define _CRT_SECURE_NO_DEPRECATE
+#include <stdio.h>
 #include <pthread.h>
 #include <math.h>
+#include "raylib.h"
 #include "list.h"
 #include "levenshtein.h"
 #include "strmap.h"
 #include "utils.h"
 #include "bins.h"
+#define SIMPLE_CALC_IMPLEMENTATION
+#include "simple_calc.h"
 
 #define invalid_chars "\\/:*?\"<>|"
 #define invalid_chars_len (array_len(invalid_chars) - 1)
@@ -234,11 +236,13 @@ int main(void)
     String buffer = {0};
     BUFF = &buffer;
     int backspace_frames = 0;
-    Unused(backspace_frames);
     char *selected = "";
+    char calc_buffer[256];
+    int font_size = 30;
 
     create_window(WIDTH, HEIGHT, "");
     SetTargetFPS(FPS);
+    Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", font_size, NULL, 0);
 
     while (!WindowShouldClose()) {
         char c;
@@ -252,6 +256,13 @@ int main(void)
             selected = value;
         }
 
+        if (buffer.count > 1 && buffer.items[0] == '=') {
+            sprintf(calc_buffer, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
+            double result = scalc_calculate(calc_buffer);
+            sprintf(calc_buffer, "%lf", result);
+            selected = calc_buffer;
+        }
+
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
                 if (buffer.count <= 0) break;
@@ -260,6 +271,8 @@ int main(void)
                 if (buffer.items[0] == '/' && buffer.count > 1) {
                     sprintf(temp, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
                     system(temp);
+                }
+                else if (buffer.items[0] == '=') {
                 }
                 else {
                     sprintf(temp, "start /b %s", selected);
@@ -300,14 +313,12 @@ int main(void)
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         {
-            int size = 30;
             float spacing = 0.8;
-            Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", size, NULL, 0);
             DrawRectangle(15, 15, WIDTH - 30, 45, DARKGRAY);
             DrawRectangle(15, 65, WIDTH - 30, 35, GRAY);
             char *c_buffer = str_to_charptr(&buffer);
-            Vector2 j = MeasureTextEx(font, c_buffer, size, spacing);
-            Vector2 k = MeasureTextEx(font, selected, size, spacing);
+            Vector2 j = MeasureTextEx(font, c_buffer, font_size, spacing);
+            Vector2 k = MeasureTextEx(font, selected, font_size, spacing);
             int start = 70;
             int showed = 6;
 
@@ -325,18 +336,18 @@ int main(void)
                         showed--;
                         char *text = &selected[last_char * (i - 1)];
                         sprintf(temp, "%.*s", last_char, text);
-                        DrawTextEx(font, temp, Vec2(20, 67 + ((i - 1) * 35)), size, spacing, WHITE);
+                        DrawTextEx(font, temp, Vec2(20, 67 + ((i - 1) * 35)), font_size, spacing, WHITE);
                     }
                     char *text = &selected[last_char * (mag - 1)];
-                    DrawTextEx(font, text, Vec2(20, 67 + ((mag - 1) * 35)), size, spacing, WHITE);
+                    DrawTextEx(font, text, Vec2(20, 67 + ((mag - 1) * 35)), font_size, spacing, WHITE);
                 }
                 else {
-                    DrawTextEx(font, selected, Vec2(20, 67), size, spacing, WHITE);
+                    DrawTextEx(font, selected, Vec2(20, 67), font_size, spacing, WHITE);
                 }
                 CstrList *bin_list = get_strlist(bins, buffer.items[0]);
-                DrawTextEx(font, c_buffer, Vec2(20, 25), size, spacing, WHITE);
+                DrawTextEx(font, c_buffer, Vec2(20, 25), font_size, spacing, WHITE);
                 for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
-                    DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), size, spacing, WHITE);
+                    DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), font_size, spacing, WHITE);
                 }
             }
         }
