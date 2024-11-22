@@ -258,7 +258,7 @@ int main(void)
 
         if (buffer.count > 1 && buffer.items[0] == '=') {
             sprintf(calc_buffer, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
-            double result = scalc_calculate(calc_buffer);
+            double result = sc_calculate(calc_buffer);
             sprintf(calc_buffer, "%lf", result);
             selected = calc_buffer;
         }
