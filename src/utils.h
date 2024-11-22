@@ -40,8 +40,10 @@ static inline void print_fraction(char *output, double d)
 
     // convert d into "+/- 0x h.hhhh p +/- ddd" representation and check for errors
     if ((n = snprintf(buf, sizeof(buf), "%+a", d)) < 0 ||
-            (unsigned)n >= sizeof(buf))
-        return;
+            (unsigned)n >= sizeof(buf)) {
+        lsbPos = 0;
+        goto END_OF_FUNC;
+    }
 
     if (strstr(buf, "0x") != buf + 1 ||
         (pp = strchr(buf, 'p')) == NULL) {
@@ -54,11 +56,15 @@ static inline void print_fraction(char *output, double d)
     p = pp + 1 + (pp[1] == '-' || pp[1] == '+'); // skip the exponent sign at first
     for (; *p != '\0'; p++)
     {
-        if (e > INT_MAX / 10)
-            return; 
+        if (e > INT_MAX / 10) {
+            lsbPos = 0;
+            goto END_OF_FUNC;
+        }
         e *= 10;
-        if (e > INT_MAX - (*p - '0'))
-            return;
+        if (e > INT_MAX - (*p - '0')) {
+            lsbPos = 0;
+            goto END_OF_FUNC;
+        }
         e += *p - '0';
     }
     if (pp[1] == '-') // apply the sign to the exponent
