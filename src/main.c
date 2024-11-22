@@ -294,7 +294,12 @@ int main(void)
                 refresh_bins(bins, &selected);
             }
             else if (IsKeyPressed(KEY_V)) {
+                const char *clipboard = GetClipboardText();
 
+                for (size_t i = 0; i < strlen(clipboard); i++) {
+                    list_push(&buffer, clipboard[i]);
+                }
+                refresh_bins(bins, &selected);
             }
         }
         else {
