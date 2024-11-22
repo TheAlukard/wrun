@@ -342,7 +342,7 @@ int main(void)
                 else {
                     DrawTextEx(font, selected, Vec2(20, 67), font_size, spacing, WHITE);
                 }
-                CstrList *bin_list = get_strlist(bins, buffer.items[0]);
+                CstrList *bin_list = get_strlist(bins, selected[0]);
                 DrawTextEx(font, c_buffer, Vec2(20, 25), font_size, spacing, WHITE);
                 for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
                     DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), font_size, spacing, WHITE);
