@@ -223,8 +223,6 @@ void refresh_bins(Bins *bins, char* *selected)
 int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    // SetExitKey(KEY_NULL);
     
     pthread_t thread;
     Bins *bins = bins_alloc();
@@ -232,7 +230,7 @@ int main(void)
     StrMap aliases = import_aliases();
     const int HEIGHT = 300;
     const int WIDTH  = 300;
-    const int FPS = 60;
+    create_window(WIDTH, HEIGHT, "", 60);
     String buffer = {0};
     BUFF = &buffer;
     int backspace_frames = 0;
@@ -240,8 +238,6 @@ int main(void)
     char calc_buffer[256];
     int font_size = 30;
 
-    create_window(WIDTH, HEIGHT, "");
-    SetTargetFPS(FPS);
     Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", font_size, NULL, 0);
 
     while (!WindowShouldClose()) {
@@ -301,7 +297,7 @@ int main(void)
         }
         else {
             if (IsKeyDown(KEY_BACKSPACE)) {
-                if (backspace_frames > FPS / 2) {
+                if (backspace_frames > GetFPS() / 2) {
                     delete_char(&buffer, bins);
                     refresh_bins(bins, &selected);
                 }

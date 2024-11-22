@@ -10,13 +10,16 @@
 
 #define Vec2(x_, y_) ((Vector2){.x = x_, .y = y_})
 
-static inline void create_window(int width, int height, const char *title)
+static inline void create_window(int width, int height, const char *title, int fps)
 {
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED);
+    SetExitKey(KEY_BACKSPACE);
     InitWindow(width, height, title);
-    ToggleBorderlessWindowed();
-    SetWindowSize(width, height);
-    // SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (75 / 2));
-    SetWindowPosition((1920 / 2) - (width / 2), (1080 / 2) - (height / 2));
+    SetTargetFPS(fps);
+    int current_monitor = GetCurrentMonitor();
+    int monitor_width = GetMonitorWidth(current_monitor);
+    int monitor_height = GetMonitorHeight(current_monitor);
+    SetWindowPosition((monitor_width / 2) - (width / 2), (monitor_height / 2) - (height / 2));
 }
 
 static inline void log_here(FILE *f, const char *str)
