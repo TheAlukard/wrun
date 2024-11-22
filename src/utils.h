@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include "raylib.h"
 
@@ -22,13 +23,105 @@ static inline void create_window(int width, int height, const char *title, int f
     SetWindowPosition((monitor_width / 2) - (width / 2), (monitor_height / 2) - (height / 2));
 }
 
-static inline void log_here(FILE *f, const char *str)
+static inline void print_fraction(char *output, double d)
 {
-    fwrite(str, sizeof(char), strlen(str), f);
-    fwrite("\n", sizeof(char), 1, f);
-    fflush(f);
-}
+    char buf[
+        1 + // sign, '-' or '+'
+            (sizeof(d) * CHAR_BIT + 3) / 4 + // mantissa hex digits max
+            1 + // decimal point, '.'
+            1 + // mantissa-exponent separator, 'p'
+            1 + // mantissa sign, '-' or '+'
+            (sizeof(d) * CHAR_BIT + 2) / 3 + // exponent decimal digits max
+            1 // string terminator, '\0'
+    ];
+    int n;
+    char *pp = NULL, *p = NULL;
+    int e, lsbFound, lsbPos;
 
+    // convert d into "+/- 0x h.hhhh p +/- ddd" representation and check for errors
+    if ((n = snprintf(buf, sizeof(buf), "%+a", d)) < 0 ||
+            (unsigned)n >= sizeof(buf))
+        return;
+
+    if (strstr(buf, "0x") != buf + 1 ||
+        (pp = strchr(buf, 'p')) == NULL) {
+        lsbPos = 0;
+        goto END_OF_FUNC;
+    }
+
+    // extract the base-2 exponent manually, checking for overflows
+    e = 0;
+    p = pp + 1 + (pp[1] == '-' || pp[1] == '+'); // skip the exponent sign at first
+    for (; *p != '\0'; p++)
+    {
+        if (e > INT_MAX / 10)
+            return; 
+        e *= 10;
+        if (e > INT_MAX - (*p - '0'))
+            return;
+        e += *p - '0';
+    }
+    if (pp[1] == '-') // apply the sign to the exponent
+        e = -e;
+
+    // find the position of the least significant non-zero bit
+    lsbFound = lsbPos = 0;
+    for (p = pp - 1; *p != 'x'; p--)
+    {
+        if (*p == '.')
+            continue;
+        if (!lsbFound)
+        {
+            int hdigit = (*p >= 'a') ? (*p - 'a' + 10) : (*p - '0'); // assuming ASCII chars
+            if (hdigit)
+            {
+                static const int lsbPosInNibble[16] = { 0,4,3,4,  2,4,3,4, 1,4,3,4, 2,4,3,4 };
+                lsbFound = 1;
+                lsbPos = -lsbPosInNibble[hdigit];
+            }
+        }
+        else
+        {
+            lsbPos -= 4;
+        }
+    }
+    lsbPos += 4;
+
+    if (!lsbFound) {
+        lsbPos = 0; // d is 0 (integer)
+        goto END_OF_FUNC;
+    }
+
+    // adjust the least significant non-zero bit position
+    // by the base-2 exponent (just add them), checking
+    // for overflows
+
+    if (lsbPos >= 0 && e >= 0) {
+        lsbPos = 0; // lsbPos + e >= 0, d is integer
+        goto END_OF_FUNC;
+    }
+
+    if (lsbPos < 0 && e < 0) {
+        if (lsbPos < INT_MIN - e) {
+            lsbPos = -2; // d isn't integer and needs too many fractional digits
+            goto END_OF_FUNC;
+        }
+    }
+
+    if ((lsbPos += e) >= 0) {
+        lsbPos = 0; 
+        goto END_OF_FUNC;
+    }
+
+    if (lsbPos == INT_MIN && -INT_MAX != INT_MIN) {
+        lsbPos = -2; // d isn't integer and needs too many fractional digits
+        goto END_OF_FUNC;
+    }
+    
+END_OF_FUNC:
+    assert(-lsbPos >= 0);
+    sprintf(output, "%.*f", -lsbPos < 15 ? -lsbPos : 14, d);
+}
 
 static inline bool str_contains(char* str, size_t size, char c)
 {

@@ -255,7 +255,8 @@ int main(void)
         if (buffer.count > 1 && buffer.items[0] == '=') {
             sprintf(calc_buffer, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
             double result = sc_calculate(calc_buffer);
-            sprintf(calc_buffer, "%lf", result);
+            // sprintf(calc_buffer, "%lf", result);
+            print_fraction(calc_buffer, result);
             selected = calc_buffer;
         }
 
@@ -269,6 +270,7 @@ int main(void)
                     system(temp);
                 }
                 else if (buffer.items[0] == '=') {
+                    SetClipboardText(selected);
                 }
                 else {
                     sprintf(temp, "start /b %s", selected);
