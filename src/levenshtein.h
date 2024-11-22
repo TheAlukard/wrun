@@ -7,7 +7,6 @@ static int cache[1024][1024];
 
 static inline int levenshteine_distance(char *s1, int len1, char *s2, int len2)
 {
-	#define max(i, j) ((i) > (j) ? (i) : (j))
 	#define min(i, j) ((i) < (j) ? (i) : (j))
 
     for (int r = 0; r < len1 + 1; r++) {
@@ -30,7 +29,6 @@ static inline int levenshteine_distance(char *s1, int len1, char *s2, int len2)
         }
     }
 
-	#undef max
 	#undef min
 
     return cache[0][0]; 
