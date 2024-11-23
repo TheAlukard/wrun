@@ -2,14 +2,14 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <math.h>
+#define SIMPLE_CALC_IMPLEMENTATION
+#include "simple_calc.h"
+#include "utils.h"
 #include "raylib.h"
 #include "list.h"
 #include "levenshtein.h"
 #include "strmap.h"
-#include "utils.h"
 #include "bins.h"
-#define SIMPLE_CALC_IMPLEMENTATION
-#include "simple_calc.h"
 
 #define invalid_chars "\\/:*?\"<>|"
 #define invalid_chars_len (array_len(invalid_chars) - 1)
@@ -18,6 +18,11 @@ char STR_ARENA[STR_ARENA_SIZE];
 
 LIST_DEF(String, char);
 LIST_DEF(StringList, String);
+
+typedef struct {
+    String buffer;
+    int cursor;
+} TextBox;
 
 FORCE_INLINE char* str_to_charptr(String *str) 
 {
@@ -39,8 +44,8 @@ String *BUFF;
 
 int compare_lev(const void *_x, const void *_y)
 {
-    int lx = strlen(*(char**)_x);
-    int ly = strlen(*(char**)_y);
+    size_t lx = strlen(*(char**)_x);
+    size_t ly = strlen(*(char**)_y);
     
     String x = {
         .items = *(char**)_x,
@@ -60,26 +65,28 @@ int compare_lev(const void *_x, const void *_y)
 
 void refresh_bins(Bins *bins, char* *selected);
 
-FORCE_INLINE void delete_char(String *buffer, Bins *bins)
+FORCE_INLINE void delete_char(TextBox *tb, Bins *bins)
 {
-    if (buffer->count <= 0) return;
-
-    Unused(list_pop(buffer, char));
+    if (tb->buffer.count <= 0) return;
+    list_remove(&tb->buffer, tb->cursor - 1);
+    if (tb->cursor > 0) tb->cursor -= 1;
     refresh_bins(bins, NULL);
 }
 
-FORCE_INLINE void delete_word(String *buffer, Bins *bins)
+FORCE_INLINE void delete_word(TextBox *tb, Bins *bins)
 {
-    if (buffer->count <= 0) return;
+    if (tb->buffer.count <= 0) return;
 
-    if (isspace(buffer->items[buffer->count - 1])) {
-        while (isspace(buffer->items[buffer->count - 1]) && buffer->count > 0) {
-            Unused(list_pop(buffer, char));
+    if (is_space(tb->buffer.items[tb->buffer.count - 1])) {
+        while (is_space(tb->buffer.items[tb->buffer.count - 1]) && tb->buffer.count > 0) {
+            list_remove(&tb->buffer, tb->cursor - 1);
+            if (tb->cursor > 0) tb->cursor -= 1;
         }
     } 
     else {
-        while (!isspace(buffer->items[buffer->count - 1]) && buffer->count > 0) {
-            Unused(list_pop(buffer, char));
+        while (!is_space(tb->buffer.items[tb->buffer.count - 1]) && tb->buffer.count > 0) {
+            list_remove(&tb->buffer, tb->cursor - 1);
+            if (tb->cursor > 0) tb->cursor -= 1;
         }
     }
 
@@ -146,7 +153,7 @@ bool read_key_value(char* *key, char* *value, FILE *f)
     while (!feof(f) && i < 100) {
         buffer[i] = getc(f);
 
-        if (isspace(buffer[i]) && buffer[i] != ' ') continue;
+        if (is_space(buffer[i]) && buffer[i] != ' ') continue;
 
         if (buffer[i] == ':') {
             int size1 = i + 1;
@@ -231,8 +238,8 @@ int main(void)
     const int HEIGHT = 300;
     const int WIDTH  = 300;
     create_window(WIDTH, HEIGHT, "", 60);
-    String buffer = {0};
-    BUFF = &buffer;
+    TextBox input = {0};
+    BUFF = &input.buffer;
     int backspace_frames = 0;
     char *selected = "";
     char calc_buffer[256];
@@ -243,31 +250,32 @@ int main(void)
     while (!WindowShouldClose()) {
         char c;
         if ((c = GetCharPressed()) != 0) {
-            list_push(&buffer, c);
+            list_insert(&input.buffer, c, input.cursor);
+            input.cursor += 1;
             refresh_bins(bins, &selected);
         }
 
-        char *value = strmap_get(&aliases, str_to_charptr(&buffer));
+        char *value = strmap_get(&aliases, str_to_charptr(&input.buffer));
         if (value != NULL) {
             selected = value;
         }
 
-        if (buffer.count > 1 && buffer.items[0] == '=') {
-            double result = sc_calculate(&buffer.items[1], (int)buffer.count - 1);
+        if (input.buffer.count > 1 && input.buffer.items[0] == '=') {
+            double result = sc_calculate(&input.buffer.items[1], (int)input.buffer.count - 1);
             print_fraction(calc_buffer, result);
             selected = calc_buffer;
         }
 
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
-                if (buffer.count <= 0) break;
+                if (input.buffer.count <= 0) break;
 
                 static char temp[256];
-                if (buffer.items[0] == '/' && buffer.count > 1) {
-                    sprintf(temp, "%.*s", (int)buffer.count - 1, &buffer.items[1]);
+                if (input.buffer.items[0] == '/' && input.buffer.count > 1) {
+                    sprintf(temp, "%.*s", (int)input.buffer.count - 1, &input.buffer.items[1]);
                     system(temp);
                 }
-                else if (buffer.items[0] == '=') {
+                else if (input.buffer.items[0] == '=') {
                     SetClipboardText(selected);
                 }
                 else {
@@ -275,27 +283,36 @@ int main(void)
                     system(temp);
                 }
 
-                list_clear(&buffer);
+                list_clear(&input.buffer);
 
                 goto PROGRAM_END;
             }
             case KEY_BACKSPACE: {
-                delete_char(&buffer, bins);
+                delete_char(&input, bins);
                 refresh_bins(bins, &selected);
                 backspace_frames = 0;
+                break;
+            }
+            case KEY_LEFT: {
+                if (input.cursor > 0) input.cursor -= 1;
+                break;
+            }
+            case KEY_RIGHT: {
+                if (input.cursor < input.buffer.count) input.cursor += 1;
                 break;
             }
         }
         if (IsKeyDown(KEY_LEFT_CONTROL)) {
             if (IsKeyPressed(KEY_BACKSPACE)) {
-                delete_word(&buffer, bins);
+                delete_word(&input, bins);
                 refresh_bins(bins, &selected);
             }
             else if (IsKeyPressed(KEY_V)) {
                 const char *clipboard = GetClipboardText();
 
                 for (size_t i = 0; i < strlen(clipboard); i++) {
-                    list_push(&buffer, clipboard[i]);
+                    list_insert(&input.buffer, clipboard[i], input.cursor);
+                    input.cursor += 1;
                 }
                 refresh_bins(bins, &selected);
             }
@@ -303,7 +320,7 @@ int main(void)
         else {
             if (IsKeyDown(KEY_BACKSPACE)) {
                 if (backspace_frames > GetFPS() / 2) {
-                    delete_char(&buffer, bins);
+                    delete_char(&input, bins);
                     refresh_bins(bins, &selected);
                 }
             }
@@ -317,17 +334,17 @@ int main(void)
             float spacing = 0.8;
             DrawRectangle(15, 15, WIDTH - 30, 45, DARKGRAY);
             DrawRectangle(15, 65, WIDTH - 30, 35, GRAY);
-            char *c_buffer = str_to_charptr(&buffer);
-            Vector2 j = MeasureTextEx(font, c_buffer, font_size, spacing);
+            char *c_buffer = str_to_charptr(&input.buffer);
+            Vector2 j = MeasureTextEx(font, "0123456789", font_size, spacing);
             Vector2 k = MeasureTextEx(font, selected, font_size, spacing);
+            float width_per_char = j.x / 10;
             int start = 70;
             int showed = 6;
 
-            DrawRectangle(20 + j.x, 15, 5, 45, LIGHTGRAY);
+            DrawRectangle((width_per_char * input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
 
-            if (buffer.count > 0) {
+            if (input.buffer.count > 0) {
                 if (k.x > WIDTH - 35) {
-                    float width_per_char = k.x / strlen(selected);
                     int last_char = floor((WIDTH - 35) / width_per_char);
                     int mag = ceil(k.x / (WIDTH - 35.f) + 0.1);
                     char temp[100];

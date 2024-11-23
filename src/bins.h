@@ -46,7 +46,7 @@ FORCE_INLINE Bins* bins_alloc(void)
 
 FORCE_INLINE CstrList* get_strlist(Bins *bins, char c)
 {
-    switch (char_lower(c)) {
+    switch (to_lower(c)) {
         case 'a': return &bins->a;
         case 'b': return &bins->b;
         case 'c': return &bins->c;

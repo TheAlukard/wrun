@@ -10,6 +10,17 @@
 #include "raylib.h"
 
 #define Vec2(x_, y_) ((Vector2){.x = x_, .y = y_})
+#define is_alpha(c) (\
+    ((c) >= 'a' && (c) <= 'z') || \
+    ((c) >= 'A' && (c) <= 'Z') || \
+    ((c) == '_')\
+)
+#define is_num(c) ((c) >= '0' && (c) <= '9')
+#define is_alnum(c) (is_alpha(c) || is_num(c))
+#define is_space(c) ((c) == ' ' || (c) == '\r' || (c) == '\t' || (c) == '\n')
+#define to_lower(c) ((c) >= 65 && (c) <= 90 ? (c) + 32 : (c))
+#define min(i, j) ((i) < (j) ? (i) : (j))
+#define max(i, j) ((i) > (j) ? (i) : (j))
 
 static inline void create_window(int width, int height, const char *title, int fps)
 {
@@ -145,13 +156,4 @@ static inline void str_copy(char *dest, size_t dest_size, char *src, size_t src_
     for (size_t i = 0; i < src_size && i < dest_size; i++) {
         dest[i] = src[i];
     }
-}
-
-static inline char char_lower(char c) 
-{
-    if (c >= 65 && c <= 90) {
-        return c + 32;
-    }
-
-    return c;
 }
