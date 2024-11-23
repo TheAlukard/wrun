@@ -14,7 +14,7 @@
     #define NUM_TYPE double
 #endif // NUM_TYPE
 
-NUM_TYPE sc_calculate(const char *text);
+NUM_TYPE sc_calculate(const char *text, int len); // -1 for null terminated string
 
 #endif // SIMPLE_CALCULATOR_H_
 
@@ -78,13 +78,15 @@ list_define(token_list, token);
 
 typedef struct {
     const char *text;
+    size_t text_len;
     size_t current;
 } T(lexer);
 
-FUN(T(lexer), lexer_new, const char *text) 
+FUN(T(lexer), lexer_new, const char *text, size_t len) 
 {
     return (T(lexer)) {
         .text = text,
+        .text_len = len,
         .current = 0,
     };
 }
@@ -113,13 +115,13 @@ FUN(T(token), tokenize_num, T(lexer) *lexer)
     T(token) token = {0};
     token.begin = &lexer->text[lexer->current];
 
-    while (is_num((CAL(lexer_peek, lexer))) && CAL(lexer_peek, lexer) != '\0') {
+    while (lexer->current < lexer->text_len && is_num((CAL(lexer_peek, lexer)))) {
         CAL(lexer_consume, lexer);
     }
 
-    if (CAL(lexer_peek, lexer) == '.') {
+    if (lexer->current < lexer->text_len && CAL(lexer_peek, lexer) == '.') {
         CAL(lexer_consume, lexer);
-        while (is_num((CAL(lexer_peek, lexer))) && CAL(lexer_peek, lexer) != '\0') {
+        while (lexer->current < lexer->text_len && is_num((CAL(lexer_peek, lexer)))) {
             CAL(lexer_consume, lexer);
         }
     }
@@ -135,7 +137,7 @@ FUN(T(token), tokenize_symbol, T(lexer) *lexer)
     T(token) token = {0};
     token.begin = &lexer->text[lexer->current];
 
-    while (is_alnum(CAL(lexer_peek, lexer))) {
+    while (lexer->current < lexer->text_len && is_alnum(CAL(lexer_peek, lexer))) {
         CAL(lexer_consume, lexer);
     }
 
@@ -148,6 +150,10 @@ FUN(T(token), tokenize_symbol, T(lexer) *lexer)
 FUN(T(token), tokenize_operator, T(lexer) *lexer)
 {
     T(token) token = {0};
+    token.type = ENUM(END);
+
+    if (lexer->current >= lexer->text_len) return token;
+
     token.begin = &lexer->text[lexer->current];
 
     switch (CAL(lexer_peek, lexer)) {
@@ -190,7 +196,7 @@ FUN(T(token), tokenize_operator, T(lexer) *lexer)
 
 FUN(void, trim_left, T(lexer) *lexer)
 {
-    while (is_space(CAL(lexer_peek, lexer))) {
+    while (lexer->current < lexer->text_len && is_space(CAL(lexer_peek, lexer))) {
         CAL(lexer_consume, lexer);
     }
 }
@@ -198,17 +204,18 @@ FUN(void, trim_left, T(lexer) *lexer)
 FUN(T(token), lexer_next, T(lexer) *lexer)
 {
     CAL(trim_left, lexer);
-    char c = CAL(lexer_peek, lexer);
 
-    if (c == '\0') {
-        CAL(lexer_consume, lexer);
+    if (lexer->current >= lexer->text_len) {
         return (T(token)) {
-            .begin = &lexer->text[lexer->current - 1],
-            .end = &lexer->text[lexer->current - 1],
+            .begin = NULL,
+            .end = NULL,
             .type = ENUM(END),
         };
     }
-    else if (is_num(c)) {
+
+    char c = CAL(lexer_peek, lexer);
+
+    if (is_num(c)) {
         return CAL(tokenize_num, lexer);
     }
     else if (is_alpha(c)) {
@@ -219,12 +226,11 @@ FUN(T(token), lexer_next, T(lexer) *lexer)
     }
 }
 
-FUN(bool, tokenize, const char* text, T(token_list) *token_list) 
+FUN(bool, tokenize, T(lexer) *lexer, T(token_list) *token_list)
 {
-    T(lexer) lexer = CAL(lexer_new, text);
     T(token) token = {0};
 
-    while ((token = CAL(lexer_next, &lexer)).type != ENUM(END)) {
+    while ((token = CAL(lexer_next, lexer)).type != ENUM(END)) {
         list_append(*token_list, token);
 
         if (token.type == ENUM(ERROR)) return false;
@@ -331,13 +337,16 @@ FUN(NUM_TYPE, expression, T(parser) *parser, T(precedence) prec)
     NUM_TYPE left = rule.prefix(parser);
 
     while (parser->current < parser->tokens->count && (int)prec < CAL(get_rule, CAL(parser_peek, parser)).lbp) {
-        if (parser->current >= parser->tokens->count) {
-            return left;
-        }
-
         token = CAL(parser_consume, parser);
 
         rule = CAL(get_rule, token);
+
+        if (rule.infix == NULL) {
+            fprintf(stderr, "ERROR: token '%.*s' shouldn't be here\n", TOKEN_LEN(token), token.begin);
+            parser->error = true;
+            return 0;
+        }
+
         NUM_TYPE right = rule.infix(parser);
 
         switch (token.type) {
@@ -360,7 +369,7 @@ FUN(NUM_TYPE, num, T(parser) *parser)
 {
     T(token) token = CAL(parser_prev, parser);
     char *endptr;
-    static char temp[100];
+    char temp[TOKEN_LEN(token) + 1];
     sprintf(temp, "%.*s", TOKEN_LEN(token), token.begin);
 
     return strtod(temp, &endptr);
@@ -390,9 +399,16 @@ FUN(NUM_TYPE, grouping, T(parser) *parser)
 
     if (CAL(parser_consume, parser).type != ENUM(RPAREN)) {
         if (parser->error) return 0;
-
+    
         token = CAL(parser_prev, parser);
-        fprintf(stderr, "ERROR: expected ')' but got '%.*s'\n", TOKEN_LEN(token), token.begin); 
+    
+        if (token.type == ENUM(END)) {
+            fprintf(stderr, "ERROR: Expresssion isn't complete\n"); 
+        }
+        else {
+            fprintf(stderr, "ERROR: expected ')' but got '%.*s'\n", TOKEN_LEN(token), token.begin); 
+        }
+
         parser->error = true;
         return 0;
     }
@@ -414,23 +430,32 @@ FUN(NUM_TYPE, parse, T(token_list) *token_list)
     NUM_TYPE result = CAL(expression, &parser, ENUM(PREC_NONE));
 
     if (parser.error) {
-        fprintf(stderr, "ERROR: Parsing failed at '%s'\n", token_list->items[parser.current].begin);
+        T(token) token = CAL(parser_prev, &parser);
+        if (token.type == ENUM(END)) {
+            fprintf(stderr, "ERROR: Parsing failed\n");
+        }
+        else {
+            fprintf(stderr, "ERROR: Parsing failed at '%.*s'\n", TOKEN_LEN(token), token.begin);
+        }
         return 0;
     }
 
     return result;
 }
 
-NUM_TYPE sc_calculate(const char *text)
+NUM_TYPE sc_calculate(const char *text, int len)
 {
-    if (text == NULL) return 0;
+    if (text == NULL || len == 0) return 0;
 
     T(token_list) token_list = {0};
-    if (!CAL(tokenize, text, &token_list)) {
-        fprintf(stderr, "ERROR: Tokenization failed at '%s'\n", token_list.items[token_list.count - 1].begin);
+    T(lexer) lexer = CAL(lexer_new, text, len < 0 ? strlen(text) : (size_t)len);
+
+    if (!CAL(tokenize, &lexer, &token_list)) {
+        fprintf(stderr, "ERROR: Tokenization failed\n");
         list_delete(token_list);
         return 0;
     }
+
     NUM_TYPE result = CAL(parse, &token_list);
     list_delete(token_list);
 
