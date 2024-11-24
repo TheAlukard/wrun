@@ -1,16 +1,19 @@
 CC=gcc
-CFLAGS=-O0 -g -Wall -Wextra -Werror -Wno-sign-compare -pedantic
+CFLAGS=-Wall -Wextra -Werror -Wno-sign-compare -pedantic
 LFLAGS=-L lib/ -lraylib -lopengl32 -lgdi32 -lwinmm -Wl,--subsystem,windows
 EXEC=./build/wrun.exe
 SRC=$(shell ls ./src/*.c)
 
-all: compile
+all: release
 
-compile: $(SRC) build
-	$(CC) -o $(EXEC) $(SRC) $(CFLAGS) $(LFLAGS)
+release: $(SRC) build
+	$(CC) -o $(EXEC) $(SRC) -O3 $(CFLAGS) $(LFLAGS)
+
+debug: $(SRC) build
+	$(CC) -o $(EXEC) $(SRC) -O0 -g $(CFLAGS) $(LFLAGS)
 
 build:
 	$(shell mkdir build)
 
-run: compile
+run: release
 	$(shell $(EXEC))
