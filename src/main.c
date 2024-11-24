@@ -65,29 +65,65 @@ int compare_lev(const void *_x, const void *_y)
 
 void refresh_bins(Bins *bins, char* *selected);
 
+FORCE_INLINE void move_cursor_left(TextBox *tb)
+{
+    if (tb->cursor > 0) tb->cursor -= 1;
+}
+
+FORCE_INLINE void move_cursor_right(TextBox *tb)
+{
+    if (tb->cursor < tb->buffer.count) tb->cursor += 1;
+}
+
+FORCE_INLINE void move_cursor_left_word(TextBox *tb)
+{
+    if (tb->cursor <= 0 || tb->buffer.count <= 0) return;
+
+    if (is_space(tb->buffer.items[tb->cursor - 1])) {
+        for (int i = tb->cursor - 1; i >= 0 && is_space(tb->buffer.items[i]); i--) {
+            move_cursor_left(tb);
+        }
+    } 
+    for (int i = tb->cursor - 1; i >= 0 && !is_space(tb->buffer.items[i]); i--) {
+        move_cursor_left(tb);
+    }
+}
+
+FORCE_INLINE void move_cursor_right_word(TextBox *tb)
+{
+    if (tb->cursor >= tb->buffer.count || tb->buffer.count <= 0) return;
+
+    if (is_space(tb->buffer.items[tb->cursor])) {
+        for (int i = tb->cursor; i < tb->buffer.count && is_space(tb->buffer.items[i]); i++) {
+            move_cursor_right(tb);
+        }
+    } 
+    for (int i = tb->cursor; i < tb->buffer.count && !is_space(tb->buffer.items[i]); i++) {
+        move_cursor_right(tb);
+    }
+}
+
 FORCE_INLINE void delete_char(TextBox *tb, Bins *bins)
 {
-    if (tb->buffer.count <= 0) return;
+    if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
     list_remove(&tb->buffer, tb->cursor - 1);
-    if (tb->cursor > 0) tb->cursor -= 1;
+    move_cursor_left(tb);
     refresh_bins(bins, NULL);
 }
 
 FORCE_INLINE void delete_word(TextBox *tb, Bins *bins)
 {
-    if (tb->buffer.count <= 0) return;
+    if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
 
     if (is_space(tb->buffer.items[tb->buffer.count - 1])) {
-        while (is_space(tb->buffer.items[tb->buffer.count - 1]) && tb->buffer.count > 0) {
+        while (tb->buffer.count > 0 && is_space(tb->buffer.items[tb->cursor - 1])) {
             list_remove(&tb->buffer, tb->cursor - 1);
-            if (tb->cursor > 0) tb->cursor -= 1;
+            move_cursor_left(tb);
         }
     } 
-    else {
-        while (!is_space(tb->buffer.items[tb->buffer.count - 1]) && tb->buffer.count > 0) {
-            list_remove(&tb->buffer, tb->cursor - 1);
-            if (tb->cursor > 0) tb->cursor -= 1;
-        }
+    while (tb->buffer.count > 0 && !is_space(tb->buffer.items[tb->cursor - 1])) {
+        list_remove(&tb->buffer, tb->cursor - 1);
+        move_cursor_left(tb);
     }
 
     refresh_bins(bins, NULL);
@@ -241,6 +277,8 @@ int main(void)
     TextBox input = {0};
     BUFF = &input.buffer;
     int backspace_frames = 0;
+    int arrow_frames = 0;
+    int arrow_cooldown = 0;
     char *selected = "";
     char calc_buffer[256];
     int font_size = 30;
@@ -266,6 +304,8 @@ int main(void)
             selected = calc_buffer;
         }
 
+        bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
                 if (input.buffer.count <= 0) break;
@@ -288,26 +328,26 @@ int main(void)
                 goto PROGRAM_END;
             }
             case KEY_BACKSPACE: {
-                delete_char(&input, bins);
-                refresh_bins(bins, &selected);
+                if (control) delete_word(&input, bins);
+                else delete_char(&input, bins);
                 backspace_frames = 0;
+                refresh_bins(bins, &selected);
                 break;
             }
             case KEY_LEFT: {
-                if (input.cursor > 0) input.cursor -= 1;
+                if (control) move_cursor_left_word(&input);
+                else move_cursor_left(&input);
+                arrow_frames = 0;
                 break;
             }
             case KEY_RIGHT: {
-                if (input.cursor < input.buffer.count) input.cursor += 1;
+                if (control) move_cursor_right_word(&input);
+                else move_cursor_right(&input);
+                arrow_frames = 0;
                 break;
             }
-        }
-        if (IsKeyDown(KEY_LEFT_CONTROL)) {
-            if (IsKeyPressed(KEY_BACKSPACE)) {
-                delete_word(&input, bins);
-                refresh_bins(bins, &selected);
-            }
-            else if (IsKeyPressed(KEY_V)) {
+            case KEY_V: {
+                if (!control) break;
                 const char *clipboard = GetClipboardText();
 
                 for (size_t i = 0; i < strlen(clipboard); i++) {
@@ -315,18 +355,32 @@ int main(void)
                     input.cursor += 1;
                 }
                 refresh_bins(bins, &selected);
+                break;
             }
         }
-        else {
-            if (IsKeyDown(KEY_BACKSPACE)) {
-                if (backspace_frames > GetFPS() / 2) {
-                    delete_char(&input, bins);
-                    refresh_bins(bins, &selected);
-                }
+
+        if (IsKeyDown(KEY_BACKSPACE)) {
+            if (backspace_frames > GetFPS() / 2) {
+                delete_char(&input, bins);
+                refresh_bins(bins, &selected);
+            }
+        }
+        if (IsKeyDown(KEY_LEFT)) {
+            if (arrow_frames > GetFPS() / 2 && arrow_cooldown > GetFPS() / 15) {
+                move_cursor_left(&input);
+                arrow_cooldown = 0;
+            }
+        }
+        else if (IsKeyDown(KEY_RIGHT)) {
+            if (arrow_frames > GetFPS() / 2 && arrow_cooldown > GetFPS() / 15) {
+                move_cursor_right(&input);
+                arrow_cooldown = 0;
             }
         }
 
         backspace_frames++;
+        arrow_frames++;
+        arrow_cooldown++;
 
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
