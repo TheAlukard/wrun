@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -Werror -Wno-sign-compare -pedantic
+CFLAGS=-Wall -Wextra -Werror -Wno-absolute-value -Wno-sign-compare -pedantic
 LFLAGS=-L lib/ -lm -lraylib -lopengl32 -lgdi32 -lwinmm -Wl,--subsystem,windows
 EXEC=./build/wrun.exe
 SRC=$(shell ls ./src/*.c)
