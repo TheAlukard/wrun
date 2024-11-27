@@ -152,10 +152,17 @@ FORCE_INLINE void add_bins(char *path, Bins *bins)
             }
         }
 
-        cur_path[end] = '\0';
+        size_t len = end - start;
+        if (len <= 0) continue;
 
-        list_push(get_strlist(bins, cur_path[start]), &cur_path[start]);
+        char *bin = malloc(sizeof(char) * (len + 1));
+        memcpy(bin, &cur_path[start], len);
+        bin[len] = '\0';
+
+        list_push(get_strlist(bins, bin[0]), bin);
     }
+
+    UnloadDirectoryFiles(flist);
 }
 
 void* get_bins(void *_list)
