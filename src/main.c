@@ -277,6 +277,7 @@ int main(void)
     pthread_t thread;
     Bins *bins = bins_alloc();
     pthread_create(&thread, NULL, get_bins, bins);
+    pthread_detach(thread);
     StrMap aliases = import_aliases();
     const int HEIGHT = 300;
     const int WIDTH  = 300;
