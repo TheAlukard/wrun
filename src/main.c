@@ -269,13 +269,13 @@ void refresh_bins(Bins *bins, char* *selected)
 
 typedef struct {
     KeyboardKey key;
-    float cooldown;
-    float init_cooldown;
-    float hold_cooldown;
-    float elapsed;
+    float cooldown; // current cooldown
+    float init_cooldown; // how much it waits before starting to repeat
+    float hold_cooldown; // how much it waits after starting to repeat
+    float elapsed; // how much time between pressses
     bool pressed;
-    void (*norm)(TextBox*);
-    void (*ctrl)(TextBox*);
+    void (*norm)(TextBox*); // without control
+    void (*ctrl)(TextBox*); // with control
 } ButtonHandler;
 
 void Handle_Button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
