@@ -278,7 +278,7 @@ typedef struct {
     void (*ctrl)(TextBox*); // with control
 } ButtonHandler;
 
-void Handle_Button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
+void handle_button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
 {
     bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
     if (IsKeyDown(btn->key)) {
@@ -386,9 +386,9 @@ int main(void)
 
         float frame_time = GetFrameTime();
         
-        Handle_Button(&input, bins, &l_arrow, frame_time);
-        Handle_Button(&input, bins, &r_arrow, frame_time);
-        Handle_Button(&input, bins, &backspc, frame_time);
+        handle_button(&input, bins, &l_arrow, frame_time);
+        handle_button(&input, bins, &r_arrow, frame_time);
+        handle_button(&input, bins, &backspc, frame_time);
 
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
