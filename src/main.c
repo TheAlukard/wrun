@@ -103,15 +103,14 @@ FORCE_INLINE void move_cursor_right_word(TextBox *tb)
     }
 }
 
-FORCE_INLINE void delete_char(TextBox *tb, Bins *bins)
+FORCE_INLINE void delete_char(TextBox *tb)
 {
     if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
     list_remove(&tb->buffer, tb->cursor - 1);
     move_cursor_left(tb);
-    refresh_bins(bins, NULL);
 }
 
-FORCE_INLINE void delete_word(TextBox *tb, Bins *bins)
+FORCE_INLINE void delete_word(TextBox *tb)
 {
     if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
 
@@ -125,8 +124,6 @@ FORCE_INLINE void delete_word(TextBox *tb, Bins *bins)
         list_remove(&tb->buffer, tb->cursor - 1);
         move_cursor_left(tb);
     }
-
-    refresh_bins(bins, NULL);
 }
 
 FORCE_INLINE void add_bins(char *path, Bins *bins)
@@ -270,6 +267,45 @@ void refresh_bins(Bins *bins, char* *selected)
     if (selected != NULL) *selected = list->items[0];
 }
 
+typedef struct {
+    KeyboardKey key;
+    float cooldown;
+    float init_cooldown;
+    float hold_cooldown;
+    float elapsed;
+    bool pressed;
+    void (*norm)(TextBox*);
+    void (*ctrl)(TextBox*);
+} ButtonHandler;
+
+void Handle_Button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
+{
+    bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    if (IsKeyDown(btn->key)) {
+        if (btn->pressed) {
+            if (btn->elapsed > btn->cooldown) {
+                if (control) btn->ctrl(input);
+                else btn->norm(input);
+                if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL);
+                btn->elapsed = 0;
+                btn->cooldown = btn->hold_cooldown;
+            }
+        }
+        else {
+            if (control) btn->ctrl(input);
+            else btn->norm(input);
+            if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL);
+            btn->cooldown = btn->init_cooldown;
+            btn->elapsed = 0;
+        }
+        btn->pressed = true;
+    }
+    else {
+        btn->pressed = false;
+    }
+    btn->elapsed += frame_time;
+}
+
 int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
@@ -284,9 +320,9 @@ int main(void)
     create_window(WIDTH, HEIGHT, "", 60);
     TextBox input = {0};
     BUFF = &input.buffer;
-    int backspace_frames = 0;
-    int arrow_frames = 0;
-    int arrow_cooldown = 0;
+    ButtonHandler l_arrow = {.key = KEY_LEFT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_left, .ctrl = move_cursor_left_word};
+    ButtonHandler r_arrow = {.key = KEY_RIGHT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_right, .ctrl = move_cursor_right_word};
+    ButtonHandler backspc = {.key = KEY_BACKSPACE, .init_cooldown = 0.3, .hold_cooldown = 0.06, .norm = delete_char, .ctrl = delete_word};
     char *selected = "";
     char calc_buffer[256];
     int font_size = 30;
@@ -335,25 +371,6 @@ int main(void)
 
                 goto PROGRAM_END;
             }
-            case KEY_BACKSPACE: {
-                if (control) delete_word(&input, bins);
-                else delete_char(&input, bins);
-                backspace_frames = 0;
-                refresh_bins(bins, &selected);
-                break;
-            }
-            case KEY_LEFT: {
-                if (control) move_cursor_left_word(&input);
-                else move_cursor_left(&input);
-                arrow_frames = 0;
-                break;
-            }
-            case KEY_RIGHT: {
-                if (control) move_cursor_right_word(&input);
-                else move_cursor_right(&input);
-                arrow_frames = 0;
-                break;
-            }
             case KEY_V: {
                 if (!control) break;
                 const char *clipboard = GetClipboardText();
@@ -367,28 +384,11 @@ int main(void)
             }
         }
 
-        if (IsKeyDown(KEY_BACKSPACE)) {
-            if (backspace_frames > GetFPS() / 2) {
-                delete_char(&input, bins);
-                refresh_bins(bins, &selected);
-            }
-        }
-        if (IsKeyDown(KEY_LEFT)) {
-            if (arrow_frames > GetFPS() / 2 && arrow_cooldown > GetFPS() / 15) {
-                move_cursor_left(&input);
-                arrow_cooldown = 0;
-            }
-        }
-        else if (IsKeyDown(KEY_RIGHT)) {
-            if (arrow_frames > GetFPS() / 2 && arrow_cooldown > GetFPS() / 15) {
-                move_cursor_right(&input);
-                arrow_cooldown = 0;
-            }
-        }
-
-        backspace_frames++;
-        arrow_frames++;
-        arrow_cooldown++;
+        float frame_time = GetFrameTime();
+        
+        Handle_Button(&input, bins, &l_arrow, frame_time);
+        Handle_Button(&input, bins, &r_arrow, frame_time);
+        Handle_Button(&input, bins, &backspc, frame_time);
 
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
