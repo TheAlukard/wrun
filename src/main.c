@@ -281,29 +281,35 @@ typedef struct {
 void handle_button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
 {
     bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+
+#define EXECUTE()                                                \
+    do {                                                         \
+        if (control) btn->ctrl(input);                           \
+        else btn->norm(input);                                   \
+        if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL); \
+        btn->elapsed = 0;                                        \
+    } while (0)
+
     if (IsKeyDown(btn->key)) {
         if (btn->pressed) {
             if (btn->elapsed > btn->cooldown) {
-                if (control) btn->ctrl(input);
-                else btn->norm(input);
-                if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL);
-                btn->elapsed = 0;
+                EXECUTE();
                 btn->cooldown = btn->hold_cooldown;
             }
         }
         else {
-            if (control) btn->ctrl(input);
-            else btn->norm(input);
-            if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL);
+            EXECUTE();
             btn->cooldown = btn->init_cooldown;
-            btn->elapsed = 0;
         }
         btn->pressed = true;
     }
     else {
         btn->pressed = false;
     }
+
     btn->elapsed += frame_time;
+
+#undef EXECUTE
 }
 
 int main(void)
