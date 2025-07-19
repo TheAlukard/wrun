@@ -1,4 +1,6 @@
-#define _CRT_SECURE_NO_DEPRECATE
+#ifndef _CRT_SECURE_NO_DEPRECATE
+    #define _CRT_SECURE_NO_DEPRECATE
+#endif
 #include <stdio.h>
 #include <pthread.h>
 #include <math.h>
