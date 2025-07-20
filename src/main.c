@@ -26,6 +26,17 @@ typedef struct {
     int cursor;
 } TextBox;
 
+typedef struct {
+    KeyboardKey key;
+    float cooldown; // current cooldown
+    float init_cooldown; // how much it waits before starting to repeat
+    float hold_cooldown; // how much it waits after starting to repeat
+    float elapsed; // how much time between pressses
+    bool pressed;
+    void (*norm)(TextBox*); // without control
+    void (*ctrl)(TextBox*); // with control
+} ButtonHandler;
+
 FORCE_INLINE char* str_to_charptr(String *str) 
 {
     if (str->count > STR_ARENA_SIZE) return NULL;
@@ -269,16 +280,6 @@ void refresh_bins(Bins *bins, char* *selected)
     if (selected != NULL) *selected = list->items[0];
 }
 
-typedef struct {
-    KeyboardKey key;
-    float cooldown; // current cooldown
-    float init_cooldown; // how much it waits before starting to repeat
-    float hold_cooldown; // how much it waits after starting to repeat
-    float elapsed; // how much time between pressses
-    bool pressed;
-    void (*norm)(TextBox*); // without control
-    void (*ctrl)(TextBox*); // with control
-} ButtonHandler;
 
 void handle_button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
 {
