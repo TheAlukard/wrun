@@ -53,30 +53,67 @@ FORCE_INLINE char* str_to_charptr(String *str)
     return ptr;
 }
 
-String *BUFF;
+#define swap(x, y, t) \
+    do {              \
+        t temp = x;   \
+        x = y;        \
+        y = temp;     \
+    } while (0)
 
-int compare_lev(const void *_x, const void *_y)
+int partition(CstrList *arr1, String *arr2, int low, int high) 
 {
-    size_t lx = strlen(*(char**)_x);
-    size_t ly = strlen(*(char**)_y);
+    int pivot = levenshteine_distance(arr1->items[high], strlen(arr1->items[high]), arr2->items, arr2->count);
     
-    String x = {
-        .items = *(char**)_x,
-        .count = lx,
-        .capacity = lx,
-    };
-    String y = {
-        .items = *(char**)_y,
-        .count = ly,
-        .capacity = ly,
-    };
-    int dx = levenshteine_distance(x.items, x.count, BUFF->items, BUFF->count);
-    int dy = levenshteine_distance(y.items, y.count, BUFF->items, BUFF->count);
+    int i = low - 1;
 
-    return dx - dy;
+    for (int j = low; j <= high - 1; j++) {
+        if (levenshteine_distance(arr1->items[j], strlen(arr1->items[j]), arr2->items, arr2->count) < pivot) {
+            i++;
+            swap(arr1->items[i], arr1->items[j], char*);
+        }
+    }
+    
+    swap(arr1->items[i + 1], arr1->items[high], char*);  
+    return i + 1;
 }
 
-void refresh_bins(Bins *bins, char* *selected);
+// The QuickSort function implementation
+void quickSort(CstrList *list, String *buffer, int low, int high) {
+    if (low < high) {
+        
+        // pi is the partition return index of pivot
+        int pi = partition(list, buffer, low, high);
+
+        // Recursion calls for smaller elements
+        // and greater or equals elements
+        quickSort(list, buffer, low, pi - 1);
+        quickSort(list, buffer, pi + 1, high);
+    }
+}
+
+//
+// int compare_lev(const void *_x, const void *_y)
+// {
+//     size_t lx = strlen(*(char**)_x);
+//     size_t ly = strlen(*(char**)_y);
+//
+//     String x = {
+//         .items = *(char**)_x,
+//         .count = lx,
+//         .capacity = lx,
+//     };
+//     String y = {
+//         .items = *(char**)_y,
+//         .count = ly,
+//         .capacity = ly,
+//     };
+//     int dx = levenshteine_distance(x.items, x.count, BUFF->items, BUFF->count);
+//     int dy = levenshteine_distance(y.items, y.count, BUFF->items, BUFF->count);
+//
+//     return dx - dy;
+// }
+
+void refresh_bins(Bins *bins, String *buffer, char* *selected);
 
 FORCE_INLINE void move_cursor_left(TextBox *tb)
 {
@@ -262,21 +299,21 @@ StrMap import_aliases(void)
     return map;
 }
 
-void refresh_bins(Bins *bins, char* *selected)
+void refresh_bins(Bins *bins, String *buffer, char* *selected)
 {
-    if (BUFF->count <= 0) return;
+    if (buffer->count <= 0) return;
 
     CstrList *list;
-    if (str_contains(invalid_chars, invalid_chars_len, BUFF->items[0]) && BUFF->count > 1) {
-        list = get_strlist(bins, BUFF->items[1]);
+    if (str_contains(invalid_chars, invalid_chars_len, buffer->items[0]) && buffer->count > 1) {
+        list = get_strlist(bins, buffer->items[1]);
     }
     else {
-        list = get_strlist(bins, BUFF->items[0]);
+        list = get_strlist(bins, buffer->items[0]);
     }
 
     if (list->count <= 0) return;
 
-    qsort(list->items, list->count, sizeof(*list->items), compare_lev);
+    quickSort(list, buffer, 0, list->count - 1);
     if (selected != NULL) *selected = list->items[0];
 }
 
@@ -285,12 +322,12 @@ void handle_button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_t
 {
     bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
 
-#define EXECUTE()                                                \
-    do {                                                         \
-        if (control) btn->ctrl(input);                           \
-        else btn->norm(input);                                   \
-        if (btn->key == KEY_BACKSPACE) refresh_bins(bins, NULL); \
-        btn->elapsed = 0;                                        \
+#define EXECUTE()                                                                \
+    do {                                                                         \
+        if (control) btn->ctrl(input);                                           \
+        else btn->norm(input);                                                   \
+        if (btn->key == KEY_BACKSPACE) refresh_bins(bins, &input->buffer, NULL); \
+        btn->elapsed = 0;                                                        \
     } while (0)
 
     if (IsKeyDown(btn->key)) {
@@ -328,7 +365,6 @@ int main(void)
     const int WIDTH  = 300;
     create_window(WIDTH, HEIGHT, "", 60);
     TextBox input = {0};
-    BUFF = &input.buffer;
     ButtonHandler l_arrow = {.key = KEY_LEFT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_left, .ctrl = move_cursor_left_word};
     ButtonHandler r_arrow = {.key = KEY_RIGHT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_right, .ctrl = move_cursor_right_word};
     ButtonHandler backspc = {.key = KEY_BACKSPACE, .init_cooldown = 0.3, .hold_cooldown = 0.06, .norm = delete_char, .ctrl = delete_word};
@@ -343,7 +379,7 @@ int main(void)
         if ((c = GetCharPressed()) != 0) {
             list_insert(&input.buffer, c, input.cursor);
             input.cursor += 1;
-            refresh_bins(bins, &selected);
+            refresh_bins(bins, &input.buffer, &selected);
         }
 
         char *value = strmap_get(&aliases, str_to_charptr(&input.buffer));
@@ -388,7 +424,7 @@ int main(void)
                     list_insert(&input.buffer, clipboard[i], input.cursor);
                     input.cursor += 1;
                 }
-                refresh_bins(bins, &selected);
+                refresh_bins(bins, &input.buffer, &selected);
                 break;
             }
         }
