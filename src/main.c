@@ -9,7 +9,6 @@
 #include "utils.h"
 #include "raylib.h"
 #include "list.h"
-#include "levenshtein.h"
 #include "strmap.h"
 #include "bins.h"
 
@@ -18,13 +17,20 @@
 #define STR_ARENA_SIZE 1000
 char STR_ARENA[STR_ARENA_SIZE];
 
-LIST_DEF(String, char);
-LIST_DEF(StringList, String);
-
 typedef struct {
     String buffer;
     int cursor;
 } TextBox;
+
+typedef struct {
+    Bins *bins;
+    TextBox input;
+    StrMap aliases;
+    Font font;
+    int font_size;
+    int height;
+    int width;
+} App;
 
 typedef struct {
     KeyboardKey key;
@@ -33,8 +39,8 @@ typedef struct {
     float hold_cooldown; // how much it waits after starting to repeat
     float elapsed; // how much time between pressses
     bool pressed;
-    void (*norm)(TextBox*); // without control
-    void (*ctrl)(TextBox*); // with control
+    void (*norm)(App*); // without control
+    void (*ctrl)(App*); // with control
 } ButtonHandler;
 
 FORCE_INLINE char* str_to_charptr(String *str) 
@@ -53,127 +59,71 @@ FORCE_INLINE char* str_to_charptr(String *str)
     return ptr;
 }
 
-#define swap(x, y, t) \
-    do {              \
-        t temp = x;   \
-        x = y;        \
-        y = temp;     \
-    } while (0)
+void refresh_bins(App *app, char* *selected);
 
-int partition(CstrList *arr1, String *arr2, int low, int high) 
+FORCE_INLINE void move_cursor_left(App *app)
 {
-    int pivot = levenshteine_distance(arr1->items[high], strlen(arr1->items[high]), arr2->items, arr2->count);
-    
-    int i = low - 1;
-
-    for (int j = low; j <= high - 1; j++) {
-        if (levenshteine_distance(arr1->items[j], strlen(arr1->items[j]), arr2->items, arr2->count) < pivot) {
-            i++;
-            swap(arr1->items[i], arr1->items[j], char*);
-        }
-    }
-    
-    swap(arr1->items[i + 1], arr1->items[high], char*);  
-    return i + 1;
+    if (app->input.cursor > 0) app->input.cursor -= 1;
 }
 
-// The QuickSort function implementation
-void quickSort(CstrList *list, String *buffer, int low, int high) {
-    if (low < high) {
-        
-        // pi is the partition return index of pivot
-        int pi = partition(list, buffer, low, high);
-
-        // Recursion calls for smaller elements
-        // and greater or equals elements
-        quickSort(list, buffer, low, pi - 1);
-        quickSort(list, buffer, pi + 1, high);
-    }
+FORCE_INLINE void move_cursor_right(App *app)
+{
+    if (app->input.cursor < app->input.buffer.count) app->input.cursor += 1;
 }
 
-//
-// int compare_lev(const void *_x, const void *_y)
-// {
-//     size_t lx = strlen(*(char**)_x);
-//     size_t ly = strlen(*(char**)_y);
-//
-//     String x = {
-//         .items = *(char**)_x,
-//         .count = lx,
-//         .capacity = lx,
-//     };
-//     String y = {
-//         .items = *(char**)_y,
-//         .count = ly,
-//         .capacity = ly,
-//     };
-//     int dx = levenshteine_distance(x.items, x.count, BUFF->items, BUFF->count);
-//     int dy = levenshteine_distance(y.items, y.count, BUFF->items, BUFF->count);
-//
-//     return dx - dy;
-// }
-
-void refresh_bins(Bins *bins, String *buffer, char* *selected);
-
-FORCE_INLINE void move_cursor_left(TextBox *tb)
+FORCE_INLINE void move_cursor_left_word(App *app)
 {
-    if (tb->cursor > 0) tb->cursor -= 1;
-}
+    if (app->input.cursor <= 0 || app->input.buffer.count <= 0) return;
 
-FORCE_INLINE void move_cursor_right(TextBox *tb)
-{
-    if (tb->cursor < tb->buffer.count) tb->cursor += 1;
-}
-
-FORCE_INLINE void move_cursor_left_word(TextBox *tb)
-{
-    if (tb->cursor <= 0 || tb->buffer.count <= 0) return;
-
-    if (is_space(tb->buffer.items[tb->cursor - 1])) {
-        for (int i = tb->cursor - 1; i >= 0 && is_space(tb->buffer.items[i]); i--) {
-            move_cursor_left(tb);
+    if (is_space(app->input.buffer.items[app->input.cursor - 1])) {
+        for (int i = app->input.cursor - 1; i >= 0 && is_space(app->input.buffer.items[i]); i--) {
+            move_cursor_left(app);
         }
     } 
-    for (int i = tb->cursor - 1; i >= 0 && !is_space(tb->buffer.items[i]); i--) {
-        move_cursor_left(tb);
+    for (int i = app->input.cursor - 1; i >= 0 && !is_space(app->input.buffer.items[i]); i--) {
+        move_cursor_left(app);
     }
 }
 
-FORCE_INLINE void move_cursor_right_word(TextBox *tb)
+FORCE_INLINE void move_cursor_right_word(App *app)
 {
-    if (tb->cursor >= tb->buffer.count || tb->buffer.count <= 0) return;
+    if (app->input.cursor >= app->input.buffer.count || app->input.buffer.count <= 0) return;
 
-    if (is_space(tb->buffer.items[tb->cursor])) {
-        for (int i = tb->cursor; i < tb->buffer.count && is_space(tb->buffer.items[i]); i++) {
-            move_cursor_right(tb);
+    if (is_space(app->input.buffer.items[app->input.cursor])) {
+        for (int i = app->input.cursor; i < app->input.buffer.count && is_space(app->input.buffer.items[i]); i++) {
+            move_cursor_right(app);
         }
     } 
-    for (int i = tb->cursor; i < tb->buffer.count && !is_space(tb->buffer.items[i]); i++) {
-        move_cursor_right(tb);
+    for (int i = app->input.cursor; i < app->input.buffer.count && !is_space(app->input.buffer.items[i]); i++) {
+        move_cursor_right(app);
     }
 }
 
-FORCE_INLINE void delete_char(TextBox *tb)
+FORCE_INLINE void delete_char(App *app)
 {
-    if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
-    list_remove(&tb->buffer, tb->cursor - 1);
-    move_cursor_left(tb);
+    if (app->input.buffer.count <= 0 || app->input.cursor <= 0) return;
+    list_remove(&app->input.buffer, app->input.cursor - 1);
+    move_cursor_left(app);
+
+    refresh_bins(app, NULL);
 }
 
-FORCE_INLINE void delete_word(TextBox *tb)
+FORCE_INLINE void delete_word(App *app)
 {
-    if (tb->buffer.count <= 0 || tb->cursor <= 0) return;
+    if (app->input.buffer.count <= 0 || app->input.cursor <= 0) return;
 
-    if (is_space(tb->buffer.items[tb->buffer.count - 1])) {
-        while (tb->buffer.count > 0 && is_space(tb->buffer.items[tb->cursor - 1])) {
-            list_remove(&tb->buffer, tb->cursor - 1);
-            move_cursor_left(tb);
+    if (is_space(app->input.buffer.items[app->input.buffer.count - 1])) {
+        while (app->input.buffer.count > 0 && is_space(app->input.buffer.items[app->input.cursor - 1])) {
+            list_remove(&app->input.buffer, app->input.cursor - 1);
+            move_cursor_left(app);
         }
     } 
-    while (tb->buffer.count > 0 && !is_space(tb->buffer.items[tb->cursor - 1])) {
-        list_remove(&tb->buffer, tb->cursor - 1);
-        move_cursor_left(tb);
+    while (app->input.buffer.count > 0 && !is_space(app->input.buffer.items[app->input.cursor - 1])) {
+        list_remove(&app->input.buffer, app->input.cursor - 1);
+        move_cursor_left(app);
     }
+
+    refresh_bins(app, NULL);
 }
 
 FORCE_INLINE void add_bins(char *path, Bins *bins)
@@ -299,34 +249,33 @@ StrMap import_aliases(void)
     return map;
 }
 
-void refresh_bins(Bins *bins, String *buffer, char* *selected)
+void refresh_bins(App *app, char* *selected)
 {
-    if (buffer->count <= 0) return;
+    if (app->input.buffer.count <= 0) return;
 
     CstrList *list;
-    if (str_contains(invalid_chars, invalid_chars_len, buffer->items[0]) && buffer->count > 1) {
-        list = get_strlist(bins, buffer->items[1]);
+    if (str_contains(invalid_chars, invalid_chars_len, app->input.buffer.items[0]) && app->input.buffer.count > 1) {
+        list = get_strlist(app->bins, app->input.buffer.items[1]);
     }
     else {
-        list = get_strlist(bins, buffer->items[0]);
+        list = get_strlist(app->bins, app->input.buffer.items[0]);
     }
 
     if (list->count <= 0) return;
 
-    quickSort(list, buffer, 0, list->count - 1);
+    quickSort(list, &app->input.buffer, 0, list->count - 1);
     if (selected != NULL) *selected = list->items[0];
 }
 
 
-void handle_button(TextBox *input, Bins *bins, ButtonHandler *btn, float frame_time)
+void handle_button(App *app, ButtonHandler *btn, float frame_time)
 {
     bool control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
 
 #define EXECUTE()                                                                \
     do {                                                                         \
-        if (control) btn->ctrl(input);                                           \
-        else btn->norm(input);                                                   \
-        if (btn->key == KEY_BACKSPACE) refresh_bins(bins, &input->buffer, NULL); \
+        if (control) btn->ctrl(app);                                             \
+        else btn->norm(app);                                                     \
         btn->elapsed = 0;                                                        \
     } while (0)
 
@@ -357,38 +306,38 @@ int main(void)
     SetTraceLogLevel(LOG_ERROR); 
     
     pthread_t thread;
-    Bins *bins = bins_alloc();
-    pthread_create(&thread, NULL, get_bins, bins);
+    App app = {0};
+    app.width= 300;
+    app.height = 300;
+    app.bins = bins_alloc();
+    app.input = (TextBox){0};
+    app.aliases = import_aliases();
+    pthread_create(&thread, NULL, get_bins, app.bins);
     pthread_detach(thread);
-    StrMap aliases = import_aliases();
-    const int HEIGHT = 300;
-    const int WIDTH  = 300;
-    create_window(WIDTH, HEIGHT, "", 60);
-    TextBox input = {0};
+    create_window(app.width, app.height, "", 60);
+    app.font_size = 30;
+    app.font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", app.font_size, NULL, 0);
     ButtonHandler l_arrow = {.key = KEY_LEFT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_left, .ctrl = move_cursor_left_word};
     ButtonHandler r_arrow = {.key = KEY_RIGHT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_right, .ctrl = move_cursor_right_word};
     ButtonHandler backspc = {.key = KEY_BACKSPACE, .init_cooldown = 0.3, .hold_cooldown = 0.06, .norm = delete_char, .ctrl = delete_word};
     char *selected = "";
     char calc_buffer[256];
-    int font_size = 30;
-
-    Font font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", font_size, NULL, 0);
 
     while (!WindowShouldClose()) {
         char c;
         if ((c = GetCharPressed()) != 0) {
-            list_insert(&input.buffer, c, input.cursor);
-            input.cursor += 1;
-            refresh_bins(bins, &input.buffer, &selected);
+            list_insert(&app.input.buffer, c, app.input.cursor);
+            app.input.cursor += 1;
+            refresh_bins(&app, &selected);
         }
 
-        char *value = strmap_get(&aliases, str_to_charptr(&input.buffer));
+        char *value = strmap_get(&app.aliases, str_to_charptr(&app.input.buffer));
         if (value != NULL) {
             selected = value;
         }
 
-        if (input.buffer.count > 1 && input.buffer.items[0] == '=') {
-            double result = sc_calculate(&input.buffer.items[1], (int)input.buffer.count - 1);
+        if (app.input.buffer.count > 1 && app.input.buffer.items[0] == '=') {
+            double result = sc_calculate(&app.input.buffer.items[1], (int)app.input.buffer.count - 1);
             print_fraction(calc_buffer, result);
             selected = calc_buffer;
         }
@@ -397,14 +346,14 @@ int main(void)
 
         switch (GetKeyPressed()) {
             case KEY_ENTER: {
-                if (input.buffer.count <= 0) break;
+                if (app.input.buffer.count <= 0) break;
 
                 static char temp[256];
-                if (input.buffer.items[0] == '/' && input.buffer.count > 1) {
-                    sprintf(temp, "%.*s", (int)input.buffer.count - 1, &input.buffer.items[1]);
+                if (app.input.buffer.items[0] == '/' && app.input.buffer.count > 1) {
+                    sprintf(temp, "%.*s", (int)app.input.buffer.count - 1, &app.input.buffer.items[1]);
                     system(temp);
                 }
-                else if (input.buffer.items[0] == '=') {
+                else if (app.input.buffer.items[0] == '=') {
                     SetClipboardText(selected);
                 }
                 else {
@@ -412,7 +361,7 @@ int main(void)
                     system(temp);
                 }
 
-                list_clear(&input.buffer);
+                list_clear(&app.input.buffer);
 
                 goto PROGRAM_END;
             }
@@ -421,58 +370,58 @@ int main(void)
                 const char *clipboard = GetClipboardText();
 
                 for (size_t i = 0; i < strlen(clipboard); i++) {
-                    list_insert(&input.buffer, clipboard[i], input.cursor);
-                    input.cursor += 1;
+                    list_insert(&app.input.buffer, clipboard[i], app.input.cursor);
+                    app.input.cursor += 1;
                 }
-                refresh_bins(bins, &input.buffer, &selected);
+                refresh_bins(&app, &selected);
                 break;
             }
         }
 
         float frame_time = GetFrameTime();
         
-        handle_button(&input, bins, &l_arrow, frame_time);
-        handle_button(&input, bins, &r_arrow, frame_time);
-        handle_button(&input, bins, &backspc, frame_time);
+        handle_button(&app, &l_arrow, frame_time);
+        handle_button(&app, &r_arrow, frame_time);
+        handle_button(&app, &backspc, frame_time);
 
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         {
             float spacing = 0.8;
-            DrawRectangle(15, 15, WIDTH - 30, 45, DARKGRAY);
-            DrawRectangle(15, 65, WIDTH - 30, 35, GRAY);
-            char *c_buffer = str_to_charptr(&input.buffer);
-            Vector2 j = MeasureTextEx(font, "0123456789", font_size, spacing);
-            Vector2 k = MeasureTextEx(font, selected, font_size, spacing);
+            DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
+            DrawRectangle(15, 65, app.width - 30, 35, GRAY);
+            char *c_buffer = str_to_charptr(&app.input.buffer);
+            Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
+            Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
             float width_per_char = j.x / 10;
             int start = 70;
             int showed = 6;
 
-            DrawRectangle((width_per_char * input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
+            DrawRectangle((width_per_char * app.input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
 
-            if (input.buffer.count > 0) {
-                if (k.x > WIDTH - 35) {
-                    int last_char = floor((WIDTH - 35) / width_per_char);
-                    int mag = ceil(k.x / (WIDTH - 35.f) + 0.1);
+            if (app.input.buffer.count > 0) {
+                if (k.x > app.width - 35) {
+                    int last_char = floor((app.width - 35) / width_per_char);
+                    int mag = ceil(k.x / (app.width - 35.f) + 0.1);
                     char temp[100];
                     for (int i = 1; i < mag; i++) {
-                        DrawRectangle(15, 65 + (i * 35), WIDTH - 30, 35, GRAY);
+                        DrawRectangle(15, 65 + (i * 35), app.width - 30, 35, GRAY);
                         start += 33;
                         showed--;
                         char *text = &selected[last_char * (i - 1)];
                         sprintf(temp, "%.*s", last_char, text);
-                        DrawTextEx(font, temp, Vec2(20, 67 + ((i - 1) * 35)), font_size, spacing, WHITE);
+                        DrawTextEx(app.font, temp, Vec2(20, 67 + ((i - 1) * 35)), app.font_size, spacing, WHITE);
                     }
                     char *text = &selected[last_char * (mag - 1)];
-                    DrawTextEx(font, text, Vec2(20, 67 + ((mag - 1) * 35)), font_size, spacing, WHITE);
+                    DrawTextEx(app.font, text, Vec2(20, 67 + ((mag - 1) * 35)), app.font_size, spacing, WHITE);
                 }
                 else {
-                    DrawTextEx(font, selected, Vec2(20, 67), font_size, spacing, WHITE);
+                    DrawTextEx(app.font, selected, Vec2(20, 67), app.font_size, spacing, WHITE);
                 }
-                CstrList *bin_list = get_strlist(bins, selected[0]);
-                DrawTextEx(font, c_buffer, Vec2(20, 25), font_size, spacing, WHITE);
+                CstrList *bin_list = get_strlist(app.bins, selected[0]);
+                DrawTextEx(app.font, c_buffer, Vec2(20, 25), app.font_size, spacing, WHITE);
                 for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
-                    DrawTextEx(font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), font_size, spacing, WHITE);
+                    DrawTextEx(app.font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), app.font_size, spacing, WHITE);
                 }
             }
         }

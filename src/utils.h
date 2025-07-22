@@ -6,14 +6,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
+#include "list.h"
 
 #include "raylib.h"
 
 #define Vec2(x_, y_) ((Vector2){.x = x_, .y = y_})
-#define is_alpha(c) (\
+#define is_alpha(c) (             \
     ((c) >= 'a' && (c) <= 'z') || \
     ((c) >= 'A' && (c) <= 'Z') || \
-    ((c) == '_')\
+    ((c) == '_')                  \
 )
 #define is_num(c) ((c) >= '0' && (c) <= '9')
 #define is_alnum(c) (is_alpha(c) || is_num(c))
@@ -21,6 +22,17 @@
 #define to_lower(c) ((c) >= 65 && (c) <= 90 ? (c) + 32 : (c))
 #define min(i, j) ((i) < (j) ? (i) : (j))
 #define max(i, j) ((i) > (j) ? (i) : (j))
+#define swap(x, y, t) \
+    do {              \
+        t temp = (x); \
+        (x) = (y);    \
+        (y) = temp;   \
+    } while (0)
+
+LIST_DEF(String, char);
+LIST_DEF(StringList, String);
+LIST_DEF(CstrList, char*);
+
 
 static inline void create_window(int width, int height, const char *title, int fps)
 {
@@ -34,7 +46,7 @@ static inline void create_window(int width, int height, const char *title, int f
     SetWindowPosition((monitor_width / 2) - (width / 2), (monitor_height / 2) - (height / 2));
 }
 
-static inline void print_fraction(char *output, double d)
+static inline void print_fraction(char *output, double d) // Stole
 {
     char buf[
         1 + // sign, '-' or '+'
@@ -140,20 +152,7 @@ END_OF_FUNC:
     sprintf(output, "%.*f", -lsbPos < 15 ? -lsbPos : 14, d);
 }
 
-static inline bool str_contains(char* str, size_t size, char c)
-{
-    for (size_t i = 0; i < size; i++) {
-        if (str[i] == c) return true;
-    }
-
-    return false;
-}
-
-static inline void str_copy(char *dest, size_t dest_size, char *src, size_t src_size)
-{
-    if (dest_size < src_size) return;
-
-    for (size_t i = 0; i < src_size && i < dest_size; i++) {
-        dest[i] = src[i];
-    }
-}
+bool str_contains(char* str, size_t size, char c);
+void str_copy(char *dest, size_t dest_size, char *src, size_t src_size);
+int partition(CstrList *arr1, String *arr2, int low, int high);
+void quickSort(CstrList *list, String *buffer, int low, int high);

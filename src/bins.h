@@ -4,8 +4,6 @@
 #include "utils.h"
 #include <stdlib.h>
 
-LIST_DEF(CstrList, char*);
-
 typedef struct {
     CstrList a;
     CstrList b;
