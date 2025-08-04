@@ -168,19 +168,19 @@ void* get_bins(void *_list)
 
     char *Path = getenv("path");
 
-	char *path = Path; 
+	char *cur_path = Path; 
 
     for (size_t i = 0; Path[i] != '\0'; i++) {
         if (Path[i] != ';') continue;
 
         Path[i] = '\0';
     
-        add_bins(path, bins);
+        add_bins(cur_path, bins);
 
-        path = &Path[i + 1];
+        cur_path = &Path[i + 1];
     }
 
-    add_bins(path, bins);
+    add_bins(cur_path, bins);
 
     return NULL;
 }
@@ -305,13 +305,13 @@ int main(void)
 {
     SetTraceLogLevel(LOG_ERROR); 
     
-    pthread_t thread;
     App app = {0};
     app.width= 300;
     app.height = 300;
     app.bins = bins_alloc();
     app.input = (TextBox){0};
     app.aliases = import_aliases();
+    pthread_t thread;
     pthread_create(&thread, NULL, get_bins, app.bins);
     pthread_detach(thread);
     create_window(app.width, app.height, "", 60);
