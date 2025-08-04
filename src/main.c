@@ -389,7 +389,8 @@ int main(void)
         {
             float spacing = 0.8;
             DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
-            DrawRectangle(15, 65, app.width - 30, 35, GRAY);
+            Rectangle rec = {.x = 15, .y = 65, .width = app.width - 30, .height = 35};
+            DrawRectangleLinesEx(rec, 3.f, GRAY);
             char *c_buffer = str_to_charptr(&app.input.buffer);
             Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
             Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
@@ -399,31 +400,35 @@ int main(void)
 
             DrawRectangle((width_per_char * app.input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
 
-            if (app.input.buffer.count > 0) {
-                if (k.x > app.width - 35) {
-                    int last_char = floor((app.width - 35) / width_per_char);
-                    int mag = ceil(k.x / (app.width - 35.f) + 0.1);
-                    char temp[100];
-                    for (int i = 1; i < mag; i++) {
-                        DrawRectangle(15, 65 + (i * 35), app.width - 30, 35, GRAY);
-                        start += 33;
-                        showed--;
-                        char *text = &selected[last_char * (i - 1)];
-                        sprintf(temp, "%.*s", last_char, text);
-                        DrawTextEx(app.font, temp, Vec2(20, 67 + ((i - 1) * 35)), app.font_size, spacing, WHITE);
-                    }
-                    char *text = &selected[last_char * (mag - 1)];
-                    DrawTextEx(app.font, text, Vec2(20, 67 + ((mag - 1) * 35)), app.font_size, spacing, WHITE);
-                }
-                else {
-                    DrawTextEx(app.font, selected, Vec2(20, 67), app.font_size, spacing, WHITE);
-                }
-                CstrList *bin_list = get_strlist(app.bins, selected[0]);
-                DrawTextEx(app.font, c_buffer, Vec2(20, 25), app.font_size, spacing, WHITE);
-                for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
-                    DrawTextEx(app.font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), app.font_size, spacing, WHITE);
-                }
+            if (app.input.buffer.count <= 0) {
+                EndDrawing();
+                continue;
             }
+
+            if (k.x > app.width - 35) {
+                int last_char = floor((app.width - 35) / width_per_char);
+                int mag = ceil(k.x / (app.width - 35.f) + 0.1);
+                char temp[100];
+                for (int i = 1; i < mag; i++) {
+                    DrawRectangle(15, 65 + (i * 35), app.width - 30, 35, GRAY);
+                    start += 33;
+                    showed--;
+                    char *text = &selected[last_char * (i - 1)];
+                    sprintf(temp, "%.*s", last_char, text);
+                    DrawTextEx(app.font, temp, Vec2(20, 67 + ((i - 1) * 35)), app.font_size, spacing, WHITE);
+                }
+                char *text = &selected[last_char * (mag - 1)];
+                DrawTextEx(app.font, text, Vec2(20, 67 + ((mag - 1) * 35)), app.font_size, spacing, WHITE);
+            }
+            else {
+                DrawTextEx(app.font, selected, Vec2(20, 67), app.font_size, spacing, WHITE);
+            }
+            CstrList *bin_list = get_strlist(app.bins, selected[0]);
+            DrawTextEx(app.font, c_buffer, Vec2(20, 25), app.font_size, spacing, WHITE);
+            for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
+                DrawTextEx(app.font, bin_list->items[i - 1], Vec2(20, start + (33 * i)), app.font_size, spacing, WHITE);
+            }
+
         }
         EndDrawing();
     }
