@@ -387,23 +387,24 @@ int main(void)
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         {
-            float spacing = 0.8;
-            DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
-            Rectangle rec = {.x = 15, .y = 65, .width = app.width - 30, .height = 35};
-            DrawRectangleLinesEx(rec, 3.f, GRAY);
-            char *c_buffer = str_to_charptr(&app.input.buffer);
-            Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
-            Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
-            float width_per_char = j.x / 10;
-            int start = 70;
-            int showed = 6;
+            const float spacing = 0.8;
+            const Rectangle rec = {.x = 15, .y = 65, .width = app.width - 30, .height = 35};
+            const char *c_buffer = str_to_charptr(&app.input.buffer);
+            const Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
+            const Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
+            const float width_per_char = j.x / 10;
 
+            DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
+            DrawRectangleLinesEx(rec, 3.f, GRAY);
             DrawRectangle((width_per_char * app.input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
 
             if (app.input.buffer.count <= 0) {
                 EndDrawing();
                 continue;
             }
+
+            int start = 70;
+            int showed = 6;
 
             if (k.x > app.width - 35) {
                 int last_char = floor((app.width - 35) / width_per_char);
