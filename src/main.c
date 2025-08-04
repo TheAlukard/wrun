@@ -388,14 +388,13 @@ int main(void)
         ClearBackground(GetColor(0x181818FF));
         {
             const float spacing = 0.8;
-            const Rectangle rec = {.x = 15, .y = 65, .width = app.width - 30, .height = 35};
             const char *c_buffer = str_to_charptr(&app.input.buffer);
             const Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
             const Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
             const float width_per_char = j.x / 10;
 
             DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
-            DrawRectangleLinesEx(rec, 3.f, GRAY);
+            DrawRectangle(15, 65, app.width - 30, 35, GRAY);
             DrawRectangle((width_per_char * app.input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
 
             if (app.input.buffer.count <= 0) {
@@ -411,7 +410,7 @@ int main(void)
                 int mag = ceil(k.x / (app.width - 35.f) + 0.1);
                 char temp[100];
                 for (int i = 1; i < mag; i++) {
-                    DrawRectangle(15, 65 + (i * 35), app.width - 30, 35, GRAY);
+                    DrawRectangle(15, 65 + (i * 33), app.width - 30, 35, GRAY);
                     start += 33;
                     showed--;
                     char *text = &selected[last_char * (i - 1)];
@@ -424,6 +423,7 @@ int main(void)
             else {
                 DrawTextEx(app.font, selected, Vec2(20, 67), app.font_size, spacing, WHITE);
             }
+
             CstrList *bin_list = get_strlist(app.bins, selected[0]);
             DrawTextEx(app.font, c_buffer, Vec2(20, 25), app.font_size, spacing, WHITE);
             for (int i = 1; i < (int)bin_list->count && i <= showed; i++) {
