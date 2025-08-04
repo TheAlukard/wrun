@@ -261,7 +261,7 @@ void refresh_bins(App *app, char* *selected)
         list = get_strlist(app->bins, app->input.buffer.items[0]);
     }
 
-    if (list->count <= 0) return;
+    if (list->count <= 0 || app->input.buffer.count <= 0) return;
 
     quickSort(list, &app->input.buffer, 0, list->count - 1);
     if (selected != NULL) *selected = list->items[0];
