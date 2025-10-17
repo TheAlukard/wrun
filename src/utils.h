@@ -36,7 +36,7 @@ LIST_DEF(CstrList, char*);
 
 static inline void create_window(int width, int height, const char *title, int fps)
 {
-    SetConfigFlags(FLAG_WINDOW_UNDECORATED);
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
     SetExitKey(KEY_BACKSPACE);
     InitWindow(width, height, title);
     SetTargetFPS(fps);
