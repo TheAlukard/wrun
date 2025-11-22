@@ -33,12 +33,21 @@ LIST_DEF(String, char);
 LIST_DEF(StringList, String);
 LIST_DEF(CstrList, char*);
 
+static inline void pause(bool (*resume_checker)(void))
+{
+    while (!resume_checker()) {
+        WaitTime(0.5f);
+    }
+
+    return;
+}
 
 static inline void create_window(int width, int height, const char *title, int fps)
 {
     SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
     SetExitKey(KEY_BACKSPACE);
     InitWindow(width, height, title);
+    SetWindowTitle("wrun");
     SetTargetFPS(fps);
     int current_monitor = GetCurrentMonitor();
     int monitor_width = GetMonitorWidth(current_monitor);

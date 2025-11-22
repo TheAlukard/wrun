@@ -6,8 +6,8 @@
 #include <math.h>
 #define SIMPLE_CALC_IMPLEMENTATION
 #include "simple_calc.h"
-#include "utils.h"
 #include "raylib.h"
+#include "utils.h"
 #include "list.h"
 #include "strmap.h"
 #include "bins.h"
