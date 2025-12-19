@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Werror -Wno-absolute-value -Wno-sign-compare -pedantic
-LFLAGS=-L lib/ -lm -lraylib -lopengl32 -lgdi32 -lwinmm -Wl,--subsystem,windows
+LFLAGS=-static -L lib/ -lm -lraylib -lopengl32 -lgdi32 -lwinmm -Wl,--subsystem,windows
 EXEC=./build/wrun
 SRC=$(shell ls ./src/*.c)
 

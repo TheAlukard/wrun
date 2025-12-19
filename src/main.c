@@ -315,8 +315,11 @@ int main(void)
     pthread_create(&thread, NULL, get_bins, app.bins);
     pthread_detach(thread);
     create_window(app.width, app.height, "", 60);
-    app.font_size = 30;
     app.font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", app.font_size, NULL, 0);
+    if (!IsFontValid(app.font)) {
+        app.font = GetFontDefault();
+    }
+    app.font_size = 30;
     ButtonHandler l_arrow = {.key = KEY_LEFT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_left, .ctrl = move_cursor_left_word};
     ButtonHandler r_arrow = {.key = KEY_RIGHT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_right, .ctrl = move_cursor_right_word};
     ButtonHandler backspc = {.key = KEY_BACKSPACE, .init_cooldown = 0.3, .hold_cooldown = 0.06, .norm = delete_char, .ctrl = delete_word};
