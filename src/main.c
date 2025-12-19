@@ -303,7 +303,7 @@ void handle_button(App *app, ButtonHandler *btn, float frame_time)
 
 int main(void)
 {
-    SetTraceLogLevel(LOG_ERROR); 
+    SetTraceLogLevel(LOG_NONE); 
     
     App app = {0};
     app.width= 300;
@@ -315,11 +315,15 @@ int main(void)
     pthread_create(&thread, NULL, get_bins, app.bins);
     pthread_detach(thread);
     create_window(app.width, app.height, "", 60);
-    app.font = LoadFontEx("C:/windows/Fonts/CascadiaCode.ttf", app.font_size, NULL, 0);
+    // FilePathList flist = LoadDirectoryFilesEx("C:\\Windows\\Fonts", ".ttf", false);        
+    // UnloadDirectoryFiles(flist);
+    // app.font = LoadFontEx(flist.paths[0], app.font_size, NULL, 0);
+    // printf("Font: %s\n", flist.paths[0]);
+    app.font_size = 30;
+    app.font = LoadFontEx("C:\\Windows\\Fonts\\consola.ttf", app.font_size, NULL, 0);
     if (!IsFontValid(app.font)) {
         app.font = GetFontDefault();
     }
-    app.font_size = 30;
     ButtonHandler l_arrow = {.key = KEY_LEFT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_left, .ctrl = move_cursor_left_word};
     ButtonHandler r_arrow = {.key = KEY_RIGHT, .init_cooldown = 0.2, .hold_cooldown = 0.05, .norm = move_cursor_right, .ctrl = move_cursor_right_word};
     ButtonHandler backspc = {.key = KEY_BACKSPACE, .init_cooldown = 0.3, .hold_cooldown = 0.06, .norm = delete_char, .ctrl = delete_word};
@@ -390,20 +394,19 @@ int main(void)
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
         {
-            const float spacing = 0.8;
+            const float spacing = 0.8f;
             const char *c_buffer = str_to_charptr(&app.input.buffer);
-            const Vector2 j = MeasureTextEx(app.font, "0123456789", app.font_size, spacing);
             const Vector2 k = MeasureTextEx(app.font, selected, app.font_size, spacing);
-            const float width_per_char = j.x / 10;
+            const char *measure_string = "abcdefghijklmnopqrstuvwxyz0123456789";
+            const size_t measure_string_length = strlen(measure_string);
+            const float width_per_char = MeasureTextEx(app.font, measure_string, app.font_size, spacing).x / (float)measure_string_length;
+            const float text_offset = 20.f;
 
             DrawRectangle(15, 15, app.width - 30, 45, DARKGRAY);
             DrawRectangle(15, 65, app.width - 30, 35, GRAY);
-            DrawRectangle((width_per_char * app.input.cursor) + 20, 15, 5, 45, LIGHTGRAY);
+            DrawRectangle((width_per_char * app.input.cursor) + text_offset, 15, 5, 45, LIGHTGRAY);
 
-            if (app.input.buffer.count <= 0) {
-                EndDrawing();
-                continue;
-            }
+            if (app.input.buffer.count <= 0) goto END_DRAWING;
 
             int start = 70;
             int showed = 6;
@@ -424,7 +427,7 @@ int main(void)
                 DrawTextEx(app.font, text, Vec2(20, 67 + ((mag - 1) * 35)), app.font_size, spacing, WHITE);
             }
             else {
-                DrawTextEx(app.font, selected, Vec2(20, 67), app.font_size, spacing, WHITE);
+                DrawTextEx(app.font, selected, Vec2(text_offset, 67), app.font_size, spacing, WHITE);
             }
 
             CstrList *bin_list = get_strlist(app.bins, selected[0]);
@@ -434,6 +437,7 @@ int main(void)
             }
 
         }
+END_DRAWING:
         EndDrawing();
     }
 
